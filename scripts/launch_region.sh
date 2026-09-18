@@ -29,6 +29,13 @@ python3 - "$HOME_REGION" > /tmp/doomfly-userdata.sh <<'PY'
 import json, base64, sys
 ud = base64.b64decode(json.load(open('/tmp/doomfly-lt.json'))['UserData']).decode()
 ud = ud.replace("export HOME=/root", f"export HOME=/root\nexport AWS_DEFAULT_REGION={sys.argv[1]}", 1)
+# RUN_SCRIPT swaps the entry point (e.g. run_v2.sh); EXTRA_ENV injects `export K=V ...` before it runs
+import os
+rs = os.environ.get("RUN_SCRIPT", "run_all.sh")
+ud = ud.replace("run_all.sh", rs)
+extra = os.environ.get("EXTRA_ENV", "").strip()
+if extra:
+    ud = ud.replace("export HOME=/root", "export HOME=/root\n" + "\n".join("export " + kv for kv in extra.split()), 1)
 print(ud, end="")
 PY
 
@@ -60,7 +67,7 @@ while read -r type; do
           --security-group-ids $SG --iam-instance-profile Arn=$PROFILE --block-device-mappings "$BDM" \
           --metadata-options HttpTokens=required --instance-initiated-shutdown-behavior terminate \
           --user-data file:///tmp/doomfly-userdata.sh \
-          --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=doomfly-trainer},{Key=Project,Value=DoomFly}]" \
+          --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=doomfly-trainer},{Key=Project,Value=DoomFly},{Key=Prefix,Value=${PREFIX_TAG:-root}}]" \
                                "ResourceType=volume,Tags=[{Key=Name,Value=doomfly-trainer}]" \
           --query "Instances[0].InstanceId" --output text 2>&1) && {
       echo "LANDED $out"
