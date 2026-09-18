@@ -5,7 +5,7 @@ set -euo pipefail
 export AWS_PROFILE=${AWS_PROFILE:-fnp3} AWS_REGION=us-west-2
 IID=$(aws ec2 describe-instances --filters Name=tag:Name,Values=doomfly-trainer Name=instance-state-name,Values=pending,running --query "Reservations[].Instances[].InstanceId" --output text)
 BUCKET=$(aws cloudformation describe-stacks --stack-name DoomFly --query "Stacks[0].Outputs[?OutputKey=='BucketName'].OutputValue" --output text)
-ENVS="export DOOMFLY_BUCKET=$BUCKET"
+ENVS="export HOME=/root DOOMFLY_BUCKET=$BUCKET"
 for v in STAGES FRAMES_PER_SCENARIO TRAIN_STEPS BATCH STOP_WHEN_DONE; do
   [[ -n "${!v:-}" ]] && ENVS="$ENVS ${v}='${!v}'"
 done

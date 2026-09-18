@@ -23,6 +23,13 @@ from constructs import Construct
 REGION = "us-west-2"
 AMI_ID = os.environ.get("DOOMFLY_AMI", "ami-0ca70308d230e8a6e")  # DLAMI OSS Nvidia PyTorch 2.7 Ubuntu 22.04
 INSTANCE_TYPE = os.environ.get("DOOMFLY_INSTANCE", "g6e.12xlarge")
+# On-demand fallback list, most preferred first. All have >= 4 GPUs so the pipeline's GPU layout
+# (teachers/recorders on GPU i%4, the two distillation runs on GPU0/GPU1) is unchanged. run_all.sh
+# halves the batch on 24 GB cards. Override with DOOMFLY_INSTANCES="a,b,c".
+INSTANCE_TYPES = os.environ.get(
+    "DOOMFLY_INSTANCES",
+    f"{INSTANCE_TYPE},g6e.24xlarge,g6e.48xlarge,g6.12xlarge,g6.24xlarge,g6.48xlarge,g5.12xlarge,g5.24xlarge,g5.48xlarge",
+).split(",")
 
 
 class DoomFlyStack(Stack):
@@ -99,7 +106,19 @@ class DoomFlyStack(Stack):
             self, "Trainer",
             vpc=vpc,
             vpc_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PUBLIC),
-            launch_template=lt,
+            # prioritized on-demand fallback across instance types AND AZs - a single type was out of
+            # capacity in all four us-west-2 AZs at the same time
+            mixed_instances_policy=autoscaling.MixedInstancesPolicy(
+                launch_template=lt,
+                launch_template_overrides=[autoscaling.LaunchTemplateOverrides(instance_type=ec2.InstanceType(t))
+                                           for t in INSTANCE_TYPES],
+                instances_distribution=autoscaling.InstancesDistribution(
+                    # PRIORITIZED kept retrying only the first type while it was out everywhere; LOWEST_PRICE
+                    # considers every listed type at once and actually gets a box.
+                    on_demand_allocation_strategy=autoscaling.OnDemandAllocationStrategy.LOWEST_PRICE,
+                    on_demand_base_capacity=0, on_demand_percentage_above_base_capacity=100,
+                ),
+            ),
             min_capacity=0, max_capacity=1, desired_capacity=1,
             health_checks=autoscaling.HealthChecks.ec2(grace_period=Duration.minutes(30)),
         )

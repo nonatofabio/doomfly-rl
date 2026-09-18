@@ -22,7 +22,13 @@ RUNS=$ROOT/runs
 S3=s3://$DOOMFLY_BUCKET
 FRAMES_PER_SCENARIO=${FRAMES_PER_SCENARIO:-300000}
 TRAIN_STEPS=${TRAIN_STEPS:-60000}
+# default batch 256 on 48 GB cards (L40S); halve it on 24 GB cards (L4 / A10G fallback instances)
+GPU_MIB=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits 2>/dev/null | head -1 || echo 49140)
+if [[ -z "${BATCH:-}" && "${GPU_MIB:-49140}" -lt 40000 ]]; then BATCH=128; fi
 BATCH=${BATCH:-256}
+# adapt to however many GPUs / cores the box actually has (capacity fallback may give us 1 GPU)
+NGPU=$(nvidia-smi -L 2>/dev/null | wc -l); NGPU=${NGPU:-1}; [[ $NGPU -ge 1 ]] || NGPU=1
+N_ENVS=${N_ENVS:-$(( $(nproc) / 5 ))}; [[ $N_ENVS -ge 2 ]] || N_ENVS=2; [[ $N_ENVS -le 8 ]] || N_ENVS=8
 STOP_WHEN_DONE=${STOP_WHEN_DONE:-1}
 STAGES=${STAGES:-"0 1 2 3 4"}
 SCENARIOS="basic defend_the_center health_gathering deadly_corridor defend_the_line"
@@ -45,16 +51,21 @@ if stage_wanted 0 && [[ ! -f $(done_marker 0) ]]; then
   export DEBIAN_FRONTEND=noninteractive
   apt-get update -qq && apt-get install -y -qq libgl1 libglu1-mesa libsdl2-2.0-0 libopenal1 tmux htop >/dev/null
   nvidia-smi | tee -a $LOGS/pipeline.log
+  log "instance type: $(curl -s -H "X-aws-ec2-metadata-token: $(curl -sX PUT http://169.254.169.254/latest/api/token -H 'X-aws-ec2-metadata-token-ttl-seconds: 60')" http://169.254.169.254/latest/meta-data/instance-type)"
   aws s3 cp $S3/code/doomfly.tar.gz $ROOT/doomfly.tar.gz
   rm -rf $CODE && mkdir -p $CODE && tar -xzf $ROOT/doomfly.tar.gz -C $CODE
   aws s3 sync $S3/connectomes $DATA/processed --only-show-errors
   ls -la $DATA/processed | tee -a $LOGS/pipeline.log
   # DLAMI ships a PyTorch venv with matching CUDA; reuse it, add our deps on top
+  # (DLAMI's activate references an unset LD_LIBRARY_PATH, which trips `set -u`; relax it around the source)
+  export LD_LIBRARY_PATH=${LD_LIBRARY_PATH:-}
+  set +u
   if [[ -f /opt/pytorch/bin/activate ]]; then
     source /opt/pytorch/bin/activate
   else
     python3 -m venv $ROOT/venv && source $ROOT/venv/bin/activate && pip install -q torch
   fi
+  set -u
   pip install -q -e "$CODE" 2>&1 | tail -3
   python - <<'EOF' | tee -a $LOGS/pipeline.log
 import torch, vizdoom, stable_baselines3
@@ -63,7 +74,9 @@ print("vizdoom", vizdoom.__version__, "sb3", stable_baselines3.__version__)
 EOF
   touch $(done_marker 0)
 fi
-if [[ -f /opt/pytorch/bin/activate ]]; then source /opt/pytorch/bin/activate; else source $ROOT/venv/bin/activate; fi
+# DLAMI's activate script trips `set -u` (LD_LIBRARY_PATH unbound) -- relax it around the source
+export LD_LIBRARY_PATH=${LD_LIBRARY_PATH:-}
+set +u; if [[ -f /opt/pytorch/bin/activate ]]; then source /opt/pytorch/bin/activate; else source $ROOT/venv/bin/activate; fi; set -u
 cd $CODE
 
 # ---------------------------------------------------------------- stage 1: teachers
@@ -72,7 +85,7 @@ if stage_wanted 1 && [[ ! -f $(done_marker 1) ]]; then
   i=0; pids=()
   for sc in $SCENARIOS; do
     if [[ ! -f $DATA/teachers/$sc.zip ]]; then
-      CUDA_VISIBLE_DEVICES=$((i % 4)) nohup python -m doomfly.doom.teacher --scenario $sc --n-envs 8 \
+      CUDA_VISIBLE_DEVICES=$((i % NGPU)) nohup python -m doomfly.doom.teacher --scenario $sc --n-envs $N_ENVS \
         --out $DATA/teachers > $LOGS/teacher_$sc.log 2>&1 &
       pids+=($!)
     fi
@@ -91,7 +104,7 @@ if stage_wanted 2 && [[ ! -f $(done_marker 2) ]]; then
   for sc in $SCENARIOS; do
     if [[ ! -f $DATA/rollouts/$sc/meta.json ]]; then
       rm -rf $DATA/rollouts/$sc
-      CUDA_VISIBLE_DEVICES=$((i % 4)) nohup python -m doomfly.doom.record --scenario $sc --teacher $DATA/teachers/$sc.zip \
+      CUDA_VISIBLE_DEVICES=$((i % NGPU)) nohup python -m doomfly.doom.record --scenario $sc --teacher $DATA/teachers/$sc.zip \
         --frames $FRAMES_PER_SCENARIO --eps 0.1 --out $DATA/rollouts/$sc > $LOGS/record_$sc.log 2>&1 &
       pids+=($!)
     fi
@@ -107,17 +120,22 @@ fi
 
 # ---------------------------------------------------------------- stage 3: train both backbones
 if stage_wanted 3 && [[ ! -f $(done_marker 3) ]]; then
-  log "stage 3: FlyNet distillation, flywire783 on GPU0, malecns49k on GPU1 ($TRAIN_STEPS steps, batch $BATCH)"
-  pids=()
-  CUDA_VISIBLE_DEVICES=0 nohup python -m doomfly.train --connectome $DATA/processed/connectome_783.npz \
-    --rollouts $DATA/rollouts --out $RUNS/flywire783 --steps $TRAIN_STEPS --batch $BATCH \
-    --s3 $S3/runs/flywire783 > $LOGS/train_flywire783.log 2>&1 &
-  pids+=($!)
-  CUDA_VISIBLE_DEVICES=1 nohup python -m doomfly.train --connectome $DATA/processed/connectome_malecns49k.npz \
-    --rollouts $DATA/rollouts --out $RUNS/malecns49k --steps $TRAIN_STEPS --batch $BATCH \
-    --s3 $S3/runs/malecns49k > $LOGS/train_malecns49k.log 2>&1 &
-  pids+=($!)
-  fail=0; for p in "${pids[@]}"; do wait $p || fail=1; done
+  # two backbones: in parallel on GPU0/GPU1 when we have >= 2 GPUs, otherwise back-to-back on GPU0
+  log "stage 3: FlyNet distillation, flywire783 + malecns49k on $NGPU GPU(s) ($TRAIN_STEPS steps, batch $BATCH)"
+  pids=(); fail=0
+  train_one() {  # $1 = run name, $2 = connectome npz, $3 = gpu index
+    CUDA_VISIBLE_DEVICES=$3 python -m doomfly.train --connectome $DATA/processed/$2 \
+      --rollouts $DATA/rollouts --out $RUNS/$1 --steps $TRAIN_STEPS --batch $BATCH \
+      --s3 $S3/runs/$1 > $LOGS/train_$1.log 2>&1
+  }
+  if [[ $NGPU -ge 2 ]]; then
+    train_one flywire783 connectome_783.npz 0 & pids+=($!)
+    train_one malecns49k connectome_malecns49k.npz 1 & pids+=($!)
+    for p in "${pids[@]}"; do wait $p || fail=1; done
+  else
+    [[ -f $RUNS/flywire783/final/model.safetensors ]] || train_one flywire783 connectome_783.npz 0 || fail=1
+    [[ -f $RUNS/malecns49k/final/model.safetensors ]] || train_one malecns49k connectome_malecns49k.npz 0 || fail=1
+  fi
   [[ $fail == 0 ]] || { log "stage 3 FAILED (see train_*.log)"; exit 1; }
   touch $(done_marker 3); log "stage 3 done"
 fi
