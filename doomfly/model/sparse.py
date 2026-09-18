@@ -23,7 +23,7 @@ class SpMM(torch.autograd.Function):
     def backward(ctx, gy):
         values, crow, col, crow_t, col_t, perm_t, x = ctx.saved_tensors
         n = crow.numel() - 1
-        gy = gy.contiguous()
+        gy = gy.contiguous().to(x.dtype)
         grad_x = grad_v = None
         if ctx.needs_input_grad[6]:
             Wt = torch.sparse_csr_tensor(crow_t, col_t, values[perm_t], size=(n, n))
@@ -92,7 +92,12 @@ class Connectome(torch.nn.Module):
         return self.sign * self.prior * torch.exp(self.log_gain)
 
     def forward(self, x):  # x: [N, B]
-        return SpMM.apply(self.values(), self.crow, self.col, self.crow_t, self.col_t, self.perm_t, x)
+        # cuSPARSE spmm/sddmm have no mixed fp32-sparse x bf16-dense kernels, so the
+        # connectome step always runs in fp32, whatever autocast the caller uses.
+        # The 15M-edge multiply is memory-bound anyway; fp32 costs little here.
+        with torch.autocast(device_type=x.device.type, enabled=False):
+            x32 = x.float()
+            return SpMM.apply(self.values().float(), self.crow, self.col, self.crow_t, self.col_t, self.perm_t, x32)
 
     def dense(self):
         """Debug only: dense [N, N] matrix (rows=post, cols=pre)."""
