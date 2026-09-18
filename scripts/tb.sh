@@ -13,7 +13,9 @@ if [[ "${1:-live}" == "s3" ]]; then
   mkdir -p /tmp/doomfly-tb
   P=${DOOMFLY_PREFIX:+${DOOMFLY_PREFIX%/}/}; mkdir -p /tmp/doomfly-tb/${P:-root}
   aws s3 sync s3://$BUCKET/${P}tb /tmp/doomfly-tb/${P:-root} --only-show-errors
-  exec tensorboard --logdir /tmp/doomfly-tb --port $PORT
+  # prefer the repo venv's tensorboard (installed by `uv pip install -e .`), so this works without activating it
+  TB=$(cd "$(dirname "$0")/.." && pwd)/.venv/bin/tensorboard; [[ -x $TB ]] || TB=tensorboard
+  exec "$TB" --logdir /tmp/doomfly-tb --port $PORT
 fi
 ID=${2:-}; [[ -n "$ID" ]] && REGION=${3:-$REGION}
 # otherwise find the trainer in any region we might have launched in
