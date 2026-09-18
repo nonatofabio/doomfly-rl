@@ -26,7 +26,8 @@ IN=$S3            # code + connectomes always come from the bucket root
 FRAMES_PER_SCENARIO=${FRAMES_PER_SCENARIO:-300000}
 TRAIN_STEPS=${TRAIN_STEPS:-60000}
 # default batch 256 on 48 GB cards (L40S); halve it on 24 GB cards (L4 / A10G fallback instances)
-GPU_MIB=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits 2>/dev/null | head -1 || echo 49140)
+GPU_MIB=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits 2>/dev/null || true)
+GPU_MIB=${GPU_MIB%%$'\n'*}; GPU_MIB=${GPU_MIB:-49140}   # first GPU only (no `| head`: pipefail + SIGPIPE on multi-GPU boxes)
 if [[ -z "${BATCH:-}" && "${GPU_MIB:-49140}" -lt 40000 ]]; then BATCH=128; fi
 BATCH=${BATCH:-256}
 # adapt to however many GPUs / cores the box actually has (capacity fallback may give us 1 GPU)
