@@ -93,8 +93,20 @@ def losses(model, batch, legal):
     pol = -(te * logp).sum(-1).mean()                      # CE with soft teacher targets (== KL + const)
     val = F.cross_entropy(out["value"].float(), value_to_bin(rt))
     with torch.no_grad():
-        acc = (logp.argmax(-1) == te.argmax(-1)).float().mean()
-    return pol, val, acc
+        hit = (logp.argmax(-1) == te.argmax(-1)).float()
+    return pol, val, hit.mean(), (hit, sc)
+
+
+def acc_by_scenario(hits_sc, names):
+    """hits_sc: list of (hit[B], sc[B]) -> {acc_<scenario>: float}. Pooled acc alone is not diagnostic:
+    a collapsed (constant-action) teacher makes its scenario trivially ~1.0 for a screen-blind student."""
+    hit = torch.cat([h for h, _ in hits_sc]); sc = torch.cat([s for _, s in hits_sc])
+    out = {}
+    for i, n in enumerate(names):
+        m = sc == i
+        if m.any():
+            out[f"acc_{n}"] = round(hit[m].mean().item(), 4)
+    return out
 
 
 def s3_sync(local: Path, uri: str):
@@ -170,6 +182,8 @@ def main():
     use_bf16 = dev.type == "cuda"
     t0, tl = time.time(), time.time()
     ema = None
+    hits_win = []
+    scen_names = list(SCENARIOS)
     eval_thread = None
 
     def save(step, tag):
@@ -203,7 +217,7 @@ def main():
         idx = np.sort(rng.choice(data.train_idx, a.batch, replace=False))
         batch = data.batch(idx, dev)
         with torch.autocast(device_type="cuda", dtype=torch.bfloat16, enabled=use_bf16):
-            pol, val, acc = losses(model, batch, legal)
+            pol, val, acc, hs = losses(model, batch, legal)
             loss = pol + a.value_coef * val
         opt.zero_grad(set_to_none=True)
         loss.backward()
@@ -212,19 +226,22 @@ def main():
 
         cur = {"pol": pol.item(), "val": val.item(), "acc": acc.item()}
         ema = cur if ema is None else {k: 0.98 * ema[k] + 0.02 * cur[k] for k in cur}
+        hits_win.append((hs[0].cpu(), hs[1].cpu()))
         if step % 50 == 0:
             row = {"step": step, **{k: round(v, 4) for k, v in ema.items()}, "gn": round(gn.item(), 3),
                    "lr": opt.param_groups[2]["lr"], "sps": round(50 * a.batch / (time.time() - tl)), "wall": round(time.time() - t0)}
+            row.update(acc_by_scenario(hits_win, scen_names)); hits_win = []
             tl = time.time()
             if step % 500 == 0:
                 model.eval()
                 with torch.no_grad(), torch.autocast(device_type="cuda", dtype=torch.bfloat16, enabled=use_bf16):
                     vi = np.sort(rng.choice(data.val_idx, min(2048, len(data.val_idx)), replace=False))
-                    vp, vv, va = [], [], []
+                    vp, vv, va, vh = [], [], [], []
                     for j in range(0, len(vi), a.batch):
-                        p_, v_, a_ = losses(model, data.batch(vi[j:j + a.batch], dev), legal)
-                        vp.append(p_.item()); vv.append(v_.item()); va.append(a_.item())
+                        p_, v_, a_, h_ = losses(model, data.batch(vi[j:j + a.batch], dev), legal)
+                        vp.append(p_.item()); vv.append(v_.item()); va.append(a_.item()); vh.append((h_[0].cpu(), h_[1].cpu()))
                     row.update(val_pol=round(np.mean(vp), 4), val_val=round(np.mean(vv), 4), val_acc=round(np.mean(va), 4))
+                    row.update({f"val_{k}": v for k, v in acc_by_scenario(vh, scen_names).items()})
                 model.train()
             log.write(json.dumps(row) + "\n"); log.flush()
             print(json.dumps(row), flush=True)

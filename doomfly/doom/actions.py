@@ -42,6 +42,13 @@ class Scenario:
     reward_lo: float = 0.0
     reward_hi: float = 1.0
     ppo_steps: int = 1_000_000
+    # teacher-side only: scale env reward before PPO sees it (Sample Factory uses 0.01 for the two
+    # scenarios whose rewards are in the +-100s; unscaled, SB3 PPO w/ clip 0.1 collapsed to a constant action)
+    reward_scale: float = 1.0
+    # teacher-side only: add health/kill/ammo delta shaping (in raw reward units, before reward_scale)
+    shaping: bool = False
+    # applied in the env itself (teacher, recorder, eval all see it). None = scenario .cfg default (5).
+    doom_skill: int | None = None
     id: int = field(default=-1)
 
 
@@ -52,10 +59,11 @@ def _legal(buttons):
 
 SCENARIOS: dict[str, Scenario] = {}
 for i, s in enumerate([
-    Scenario("basic", "basic.cfg", (B_LEFT, B_RIGHT, B_ATTACK), (), ppo_steps=300_000),
+    Scenario("basic", "basic.cfg", (B_LEFT, B_RIGHT, B_ATTACK), (), ppo_steps=1_000_000, reward_scale=0.01),
     Scenario("defend_the_center", "defend_the_center.cfg", (B_TL, B_TR, B_ATTACK), (), ppo_steps=1_500_000),
     Scenario("health_gathering", "health_gathering.cfg", (B_TL, B_TR, B_FWD), (), ppo_steps=1_500_000),
-    Scenario("deadly_corridor", "deadly_corridor.cfg", (B_ATTACK, B_LEFT, B_RIGHT, B_FWD, B_BACK, B_TL, B_TR), (), ppo_steps=3_000_000),
+    Scenario("deadly_corridor", "deadly_corridor.cfg", (B_ATTACK, B_LEFT, B_RIGHT, B_FWD, B_BACK, B_TL, B_TR), (),
+             ppo_steps=8_000_000, reward_scale=0.01, shaping=True, doom_skill=3),
     Scenario("defend_the_line", "defend_the_line.cfg", (B_TL, B_TR, B_ATTACK), (), ppo_steps=1_500_000),
 ]):
     s.id = i

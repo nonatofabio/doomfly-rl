@@ -46,6 +46,8 @@ class DoomEnv(gym.Env):
         g.set_available_buttons([getattr(vzd.Button, b) for b in self.sc.buttons])
         g.set_mode(vzd.Mode.PLAYER)
         g.set_render_hud(True)
+        if self.sc.doom_skill is not None:
+            g.set_doom_skill(self.sc.doom_skill)
         if seed is not None:
             g.set_seed(seed)
         g.init()
