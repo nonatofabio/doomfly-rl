@@ -68,6 +68,8 @@ class DoomEnv(gym.Env):
 
     def reset(self, *, seed=None, options=None):
         super().reset(seed=seed)
+        if seed is not None:  # reseed the engine so seed-matched envs replay the same episode (GRPO groups)
+            self.game.set_seed(int(seed))
         self.game.new_episode()
         self.frames.clear()
         st = self.game.get_state()

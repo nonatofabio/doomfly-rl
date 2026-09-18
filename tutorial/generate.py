@@ -15,6 +15,8 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from doomfly.doom.actions import ACTIONS, SCENARIOS  # noqa: E402
+from doomfly.doom.env import FRAME_H, FRAME_STACK, FRAME_W  # noqa: E402
+from doomfly.doom.record import GAMMA  # noqa: E402
 from doomfly.model.flynet import FlyNet, FlyNetConfig, load_connectome  # noqa: E402
 
 BACKBONES = {
@@ -80,8 +82,18 @@ def main():
     stats = {
         "backbones": [summarise(k) for k in BACKBONES],
         "actions": list(ACTIONS),
-        "scenarios": {k: {"n_legal": len(v.actions), "buttons": list(v.buttons)} for k, v in SCENARIOS.items()},
+        "scenarios": {k: {"n_legal": len(v.actions), "buttons": list(v.buttons), "frame_skip": v.frame_skip,
+                          "ppo_steps": v.ppo_steps, "reward_scale": v.reward_scale, "shaping": v.shaping,
+                          "doom_skill": v.doom_skill if v.doom_skill is not None else 5} for k, v in SCENARIOS.items()},
         "model_config": FlyNetConfig().__dict__,
+        "frame": {"h": FRAME_H, "w": FRAME_W, "stack": FRAME_STACK, "bytes": FRAME_H * FRAME_W * FRAME_STACK},
+        "rollout": {"frames_per_scenario": 300_000, "eps": 0.1, "gamma": GAMMA, "shard_frames": 20_000,
+                    "schema": [["frames", "u8", "[T,4,72,96]", "4-frame stack, grayscale, area-averaged from 320x240"],
+                               ["scenario", "i8", "[T]", "scenario id (0-4), selects legal mask + value normalisation"],
+                               ["action", "i8", "[T]", "action actually taken (teacher argmax, or random w.p. eps)"],
+                               ["teacher", "f16", "[T,22]", "teacher's full softmax over the 22-action vocabulary (soft target)"],
+                               ["ret", "f32", "[T]", "discounted return-to-go from this state, gamma 0.99"],
+                               ["episode", "i32", "[T]", "episode id, so shards can be split without leaking episodes"]]},
     }
     assets = ROOT / "tutorial/assets"; assets.mkdir(exist_ok=True)
     (assets / "stats.json").write_text(json.dumps(stats))

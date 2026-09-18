@@ -27,11 +27,12 @@ code,pre{font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace}pre{backgroun
 .arrow{align-self:center;color:var(--acc2);font-size:22px}
 .stage{display:grid;grid-template-columns:44px 1fr;gap:14px;margin:14px 0}.stage .num{width:44px;height:44px;border-radius:10px;background:#1f2431;display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--acc2)}
 .matrix td.on{background:#22381a;color:var(--out);text-align:center}.matrix td.off{color:#3a3f4d;text-align:center}
+.vid{position:relative;background:#0d1017;border:1px solid var(--grid);border-radius:10px;aspect-ratio:4/3;overflow:hidden}.vid video{width:100%;height:100%;object-fit:contain;display:block}.vid .ph{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:var(--mute);font-size:13px;text-align:center;padding:12px}.vid .ph b{color:var(--acc2);font-size:15px}.vid.has .ph{display:none}.algo th,.algo td{text-align:left;vertical-align:top}
 footer{margin-top:60px;color:var(--mute);font-size:13px}a{color:var(--in)}
 </style>
 </head>
 <body><main>
-<div><span class="tag a">connectome-constrained RNN</span><span class="tag b">ViZDoom</span><span class="tag">policy distillation</span><span class="tag">2 backbones</span></div>
+<div><span class="tag a">connectome-constrained RNN</span><span class="tag b">ViZDoom</span><span class="tag">policy distillation</span><span class="tag">2 backbones</span><span class="tag">critic-free GRPO</span></div>
 <h1>DoomFly: a <span>fruit-fly brain</span>, wired exactly as nature left it, learns to play Doom.</h1>
 <p class="lead">This is the Doom analogue of <a href="https://huggingface.co/mlabonne/chessfly">chessfly</a>. We take a real <em>Drosophila</em> connectome — every neuron, every synapse, sign and strength — freeze the wiring, and let gradient descent tune only per-synapse gains and per-neuron homeostasis. Pixels go in through the fly's visual sensory neurons; actions come out of its central, descending and motor neurons. Every number on this page was computed from the connectome files that train the model.</p>
 <div id="kpis" class="grid g4" style="margin-top:22px"></div>
@@ -72,6 +73,7 @@ footer{margin-top:60px;color:var(--mute);font-size:13px}a{color:var(--in)}
 <div class="stage"><div class="num">2</div><div><b>Rollouts.</b> Each teacher plays its scenario ε-greedily (ε = 0.1) for 300k frames. We store the frame stack, the teacher's full action distribution (soft target), the discounted return, and the legality mask, as <code>.npz</code> shards.</div></div>
 <div class="stage"><div class="num">3</div><div><b>Distillation into the fly.</b> Two FlyNets train concurrently — FlyWire 783 on GPU 0, MaleCNS 49k on GPU 1 — with soft-target cross-entropy on the policy and a 64-bin categorical cross-entropy on the value (the chessfly/MuZero trick). Three AdamW groups: synaptic log-gains (lr 3e-3), homeostasis, and the rest (lr 3e-4); warm-up + cosine; bf16. Every few thousand steps the fly plays all five scenarios live and saves a GIF of its best episode.</div></div>
 <div class="stage"><div class="num">4</div><div><b>Wrap up.</b> Sync checkpoints, eval logs and GIFs to S3, then <code>shutdown -h now</code>.</div></div>
+<div class="stage"><div class="num">5</div><div><b>Optional: fine-tune the fly on its own play (GRPO).</b> <code>doomfly/grpo.py</code> takes the distilled checkpoint, plays each scenario in seed-matched groups, and pushes the policy toward the actions that beat the group's mean return — no value network, no teacher, a KL leash to the distilled policy. This is the step that can let the fly surpass its teacher (§7).</div></div>
 <div class="grid g3" style="margin-top:10px">
   <div class="panel"><h3>Policy loss</h3><div class="eq" style="font-size:15px">L<sub>π</sub> = − Σ<sub>a legal</sub> p<sub>teacher</sub>(a) · log p<sub>fly</sub>(a)</div><small style="color:var(--mute)">Soft targets carry the teacher's uncertainty, which matters when several actions are near-equivalent.</small></div>
   <div class="panel"><h3>Value loss</h3><div class="eq" style="font-size:15px">L<sub>v</sub> = CE(bin(G<sub>t</sub>), v<sub>fly</sub>) over 64 bins</div><small style="color:var(--mute)">Return normalised per scenario to [0,1], then classified rather than regressed — stabler with heavy-tailed rewards.</small></div>
@@ -81,14 +83,46 @@ stage 3:   GPU0 flywire783
            GPU2-3 idle</pre></div>
 </div>
 
-<h2><span class="n">7</span>Reproduce</h2>
+<h2><span class="n">7</span>The three algorithms, side by side</h2>
+<p>Three optimisers touch this project and they answer three different questions. PPO asks "which actions raise the return?" and needs a learned critic to answer it. Distillation asks "what would the teacher do here?" and needs no reward at all. GRPO asks PPO's question again, but replaces the critic with sibling episodes that started from the same seed — the trick behind DeepSeek-R1's reasoning training, applied to a 138k-neuron fly.</p>
+<div class="grid g3">
+  <div class="panel"><h3>1 · PPO (teacher, SB3)</h3><div class="eq" style="font-size:14px">r<sub>t</sub> = π<sub>θ</sub>(a<sub>t</sub>|s<sub>t</sub>) / π<sub>old</sub>(a<sub>t</sub>|s<sub>t</sub>)<br>L = −E[min(r<sub>t</sub>Â<sub>t</sub>, clip(r<sub>t</sub>,1±ε)Â<sub>t</sub>)] + c<sub>v</sub>(V−G)² − c<sub>H</sub>H</div><small style="color:var(--mute)">Â<sub>t</sub> from GAE(λ=0.95) on a learned value head V(s). Clip ε = 0.1, 8 envs × 128 steps per update. Reward pre-scaled ×0.01 on the ±100-reward maps — without it the teacher collapsed to one action.</small></div>
+  <div class="panel"><h3>2 · Distillation (fly ← teacher)</h3><div class="eq" style="font-size:14px">L = −Σ<sub>a legal</sub> p<sub>T</sub>(a) log p<sub>fly</sub>(a) + CE(bin(G<sub>t</sub>), v<sub>fly</sub>)</div><small style="color:var(--mute)">Supervised, off-policy, no environment in the loop. Learns from 1.5M stored frames; the fly's own mistakes never influence what it sees. Ceiling = the teacher.</small></div>
+  <div class="panel"><h3>3 · GRPO / RLOO (fly ← its own play)</h3><div class="eq" style="font-size:14px">Â<sub>i</sub> = (R<sub>i</sub> − mean<sub>j≠i</sub> R<sub>j</sub>) / std(R)<br>L = −E[min(r Â, clip(r,1±ε) Â)] + β KL(π<sub>fly</sub> ‖ π<sub>ref</sub>) − c<sub>H</sub>H</div><small style="color:var(--mute)">G episodes per group share one ViZDoom seed, so the same monsters spawn in the same places — return differences are the policy's fault, not the map's. Â is one number per episode, broadcast to all its steps. π<sub>ref</sub> = frozen distilled fly.</small></div>
+</div>
+<div class="panel" style="margin-top:16px;overflow:auto"><table class="algo"><thead><tr><th></th><th>PPO teacher</th><th>Distillation</th><th>GRPO fine-tune</th></tr></thead><tbody>
+<tr><td>learns from</td><td>its own rollouts + reward</td><td>teacher's action distribution + returns</td><td>the fly's own rollouts + reward</td></tr>
+<tr><td>critic / value net</td><td>yes (learned V(s))</td><td>value head trained as a 64-bin classifier, unused for control</td><td>none — group mean is the baseline</td></tr>
+<tr><td>variance control</td><td>GAE, advantage normalisation</td><td>n/a (supervised)</td><td>leave-one-out baseline, seed matching, per-group std</td></tr>
+<tr><td>what stops it drifting</td><td>clip ε, entropy bonus</td><td>the dataset</td><td>clip ε + KL to the distilled fly</td></tr>
+<tr><td>can beat the teacher?</td><td>—</td><td>no</td><td>yes, in principle</td></tr>
+<tr><td>compute per update</td><td>1k frames, small CNN</td><td>1 minibatch through 51M-param fly</td><td>G×groups full episodes through the fly, then k PPO epochs</td></tr>
+</tbody></table></div>
+<p style="margin-top:14px">Why not run GRPO from scratch? A randomly-initialised fly wins ≈0 episodes in <code>deadly_corridor</code>, so every group has zero return variance and zero gradient. Distillation first gives GRPO a policy that <em>sometimes</em> succeeds, which is all a group-relative method needs. Why not plain PPO on the fly? A second 51M-parameter value head doubles memory and, at this scale, learns slower than the policy it is meant to guide; the group baseline is free.</p>
+
+<h2><span class="n">8</span>The data</h2>
+<p>Every training example is a stack of the last four grayscale frames, area-averaged from ViZDoom's 320×240 render to <span id="frame-geom"></span>. Frame-skip 4 means one decision per 4 game tics (≈ 8.75 decisions/s). Each scenario contributes the same number of frames, recorded by its own teacher with ε = <span id="rollout-eps"></span> random actions so the fly also sees how to recover from mistakes.</p>
+<div class="grid g2">
+  <div class="panel" style="overflow:auto"><h3>One rollout shard (<code>shard_XXXX.npz</code>)</h3><table id="schema"></table></div>
+  <div class="panel" style="overflow:auto"><h3>Per-scenario training recipe</h3><table id="recipe"></table></div>
+</div>
+<div id="datakpis" class="grid g4" style="margin-top:16px"></div>
+<p style="margin-top:14px"><b>Two things we learned the hard way.</b> (1) <code>basic</code> and <code>deadly_corridor</code> pay ±100 per event; SB3 PPO with clip 0.1 saw those as saturating and settled on a single action. Scaling rewards by 0.01 before the learner (Sample Factory does the same) fixed it. (2) <code>deadly_corridor</code> at the default skill 5 is nearly unwinnable for an early agent, so we add health/kill/ammo delta shaping and drop to skill 3 for the teacher; the fly is evaluated on the unshaped reward.</p>
+
+<h2><span class="n">9</span>Watch the fly play</h2>
+<p>One clip per scenario per backbone, rendered from the best evaluation episode of the final checkpoint. Clips are produced by <code>python -m doomfly.evaluate --gif</code> and converted with <code>ffmpeg -i best.gif -movflags faststart -pix_fmt yuv420p tutorial/assets/videos/&lt;backbone&gt;_&lt;scenario&gt;.mp4</code>. Slots without a file show a placeholder until the run finishes.</p>
+<div id="videos"></div>
+
+<h2><span class="n">10</span>Reproduce</h2>
 <pre>uv sync
 python -m doomfly.connectome.build_flywire   # -> data/processed/connectome_783.npz
 python -m doomfly.connectome.build_malecns   # -> data/processed/connectome_malecns49k.npz
 cd infra && cdk bootstrap && cdk deploy      # fnp3 / us-west-2, g6e.12xlarge
 scripts/ship.sh                              # code + connectomes -> S3 (instance waits for this)
 scripts/status.sh                            # tail the mirrored logs
-STAGES="3 4" TRAIN_STEPS=80000 scripts/launch.sh   # re-run just the distillation later</pre>
+STAGES="3 4" TRAIN_STEPS=80000 scripts/launch.sh   # re-run just the distillation later
+python -m doomfly.grpo --ckpt runs/flywire783/final --connectome data/processed/connectome_783.npz \
+    --out runs/flywire783_grpo --groups 8 --group-size 8 --beta 0.05 --s3 s3://.../grpo   # critic-free fine-tune</pre>
 
 <footer id="foot"></footer>
 </main>
@@ -159,5 +193,19 @@ B.forEach((b,i)=>{const d=document.createElement("div");d.className="panel";d.in
  `<tr><th>legal actions</th><th></th>${sc.map(([k,v])=>`<th>${v.n_legal}</th>`).join("")}</tr>`}
 
 $("#foot").innerHTML=`Generated by <code>tutorial/generate.py</code> from ${B.map(b=>`<code>data/processed/${b.key==="flywire783"?"connectome_783":"connectome_malecns49k"}.npz</code>`).join(" and ")}. References: ${B[0].source_meta.references.map(r=>`<a href="${r}">${r.replace("https://doi.org/","")}</a>`).join(", ")}; MaleCNS subset: <a href="https://huggingface.co/datasets/fernandofernandes/fly-connectome-49k">fernandofernandes/fly-connectome-49k</a> (${B[1].source_meta.license}). Model recipe after <a href="https://huggingface.co/mlabonne/chessfly">mlabonne/chessfly</a>.`;
+
+// data section
+{const f=DATA.frame,r=DATA.rollout,sc=Object.entries(DATA.scenarios);
+$("#frame-geom").textContent=`${f.w}×${f.h} (${f.stack}×${f.h}×${f.w} = ${f.bytes.toLocaleString()} bytes per example)`;
+$("#rollout-eps").textContent=r.eps;
+$("#schema").innerHTML=`<tr><th>key</th><th>dtype</th><th>shape</th><th>meaning</th></tr>`+r.schema.map(x=>`<tr><td><code>${x[0]}</code></td><td style="text-align:left">${x[1]}</td><td style="text-align:left"><code>${x[2]}</code></td><td style="text-align:left;color:var(--mute)">${x[3]}</td></tr>`).join("");
+$("#recipe").innerHTML=`<tr><th>scenario</th><th>legal</th><th>PPO steps</th><th>reward ×</th><th>shaping</th><th>skill</th></tr>`+sc.map(([k,v])=>`<tr><td><code>${k}</code></td><td>${v.n_legal}</td><td>${fmt(v.ppo_steps)}</td><td>${v.reward_scale}</td><td>${v.shaping?"yes":"—"}</td><td>${v.doom_skill}</td></tr>`).join("");
+const tot=r.frames_per_scenario*sc.length;
+$("#datakpis").innerHTML=`<div class="panel kpi"><div class="v">${fmt(tot)}</div><div class="l">stored frames · ${sc.length} × ${fmt(r.frames_per_scenario)}</div></div>
+<div class="panel kpi"><div class="v">${(tot*f.bytes/2**30).toFixed(1)} GiB</div><div class="l">of uint8 frame stacks (before npz compression)</div></div>
+<div class="panel kpi"><div class="v">${fmt(r.shard_frames)}</div><div class="l">frames per shard · γ = ${r.gamma}</div></div>
+<div class="panel kpi"><div class="v">${fmt(sc.reduce((a,[k,v])=>a+v.ppo_steps,0))}</div><div class="l">total teacher PPO env steps</div></div>`;}
+// videos (placeholders until assets/videos/<backbone>_<scenario>.mp4 exists)
+{const sc=Object.keys(DATA.scenarios);$("#videos").innerHTML=B.map((b,i)=>`<h3 style="margin-top:22px;color:${C[i]}">${b.label}</h3><div class="grid g3">`+sc.map(k=>{const src=`assets/videos/${b.key}_${k}.mp4`;return `<div><div class="vid" id="v-${b.key}-${k}"><video muted loop playsinline preload="metadata" src="${src}" onloadeddata="this.parentNode.classList.add('has')" onmouseenter="this.play()" onmouseleave="this.pause()" onerror="this.parentNode.classList.remove('has')"></video><div class="ph"><b>${k}</b><span>video coming soon</span><span style="font-size:11px">${src}</span></div></div><small style="color:var(--mute)">${k} · ${DATA.scenarios[k].n_legal} legal actions · hover to play</small></div>`}).join("")+`</div>`).join("");}
 </script>
 </body></html>
