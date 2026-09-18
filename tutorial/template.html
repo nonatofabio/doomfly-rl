@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>DoomFly — a fruit-fly connectome learns to play Doom</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+:root{--bg:#0b0d12;--panel:#141821;--ink:#e8e6df;--mute:#9aa0ad;--acc:#ff5a36;--acc2:#ffc857;--in:#4cc9f0;--out:#b5e853;--oth:#5b6070;--grid:#232838}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 -apple-system,Inter,Segoe UI,Helvetica,Arial,sans-serif}
+main{max-width:1180px;margin:0 auto;padding:32px 20px 80px}
+h1{font-size:44px;line-height:1.05;margin:0 0 8px;letter-spacing:-.02em}h1 span{color:var(--acc)}
+h2{font-size:26px;margin:56px 0 6px;letter-spacing:-.01em}h2 .n{display:inline-block;width:34px;height:34px;border-radius:50%;background:var(--acc);color:#000;text-align:center;line-height:34px;font-size:16px;margin-right:12px;font-weight:700}
+h3{font-size:15px;color:var(--mute);text-transform:uppercase;letter-spacing:.08em;margin:18px 0 8px}
+p.lead{font-size:19px;color:#cfd3dc;max-width:820px}p{max-width:820px}
+.grid{display:grid;gap:16px}.g2{grid-template-columns:repeat(auto-fit,minmax(340px,1fr))}.g3{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}.g4{grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
+.panel{background:var(--panel);border:1px solid var(--grid);border-radius:14px;padding:18px}
+.kpi .v{font-size:34px;font-weight:700;letter-spacing:-.02em;line-height:1.1}.kpi .l{color:var(--mute);font-size:13px;margin-top:4px}
+.tag{display:inline-block;padding:2px 10px;border-radius:999px;font-size:12px;background:#1f2431;color:var(--mute);margin-right:6px}
+.tag.a{background:#3a1d16;color:var(--acc)}.tag.b{background:#16303a;color:var(--in)}
+svg text{fill:var(--ink);font:12px -apple-system,Inter,sans-serif}svg .ax{stroke:var(--grid)}svg .mute{fill:var(--mute)}
+.legend span{display:inline-flex;align-items:center;gap:6px;margin-right:16px;font-size:13px;color:var(--mute)}.legend i{width:12px;height:12px;border-radius:3px;display:inline-block}
+table{border-collapse:collapse;width:100%;font-size:14px}td,th{padding:8px 10px;border-bottom:1px solid var(--grid);text-align:right}th:first-child,td:first-child{text-align:left}th{color:var(--mute);font-weight:600}
+code,pre{font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace}pre{background:#0d1017;border:1px solid var(--grid);border-radius:10px;padding:14px;overflow:auto;color:#d7dbe3}
+.eq{font:18px/1.6 ui-monospace,Menlo,monospace;background:#0d1017;border-left:3px solid var(--acc2);padding:12px 16px;border-radius:0 10px 10px 0;margin:12px 0}
+.flow{display:flex;flex-wrap:wrap;gap:10px;align-items:stretch}.flow .box{flex:1 1 150px;background:#0d1017;border:1px solid var(--grid);border-radius:10px;padding:12px;position:relative}
+.flow .box b{display:block;font-size:14px;margin-bottom:4px}.flow .box small{color:var(--mute);font-size:12px}.flow .box.hot{border-color:var(--acc)}
+.arrow{align-self:center;color:var(--acc2);font-size:22px}
+.stage{display:grid;grid-template-columns:44px 1fr;gap:14px;margin:14px 0}.stage .num{width:44px;height:44px;border-radius:10px;background:#1f2431;display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--acc2)}
+.matrix td.on{background:#22381a;color:var(--out);text-align:center}.matrix td.off{color:#3a3f4d;text-align:center}
+footer{margin-top:60px;color:var(--mute);font-size:13px}a{color:var(--in)}
+</style>
+</head>
+<body><main>
+<div><span class="tag a">connectome-constrained RNN</span><span class="tag b">ViZDoom</span><span class="tag">policy distillation</span><span class="tag">2 backbones</span></div>
+<h1>DoomFly: a <span>fruit-fly brain</span>, wired exactly as nature left it, learns to play Doom.</h1>
+<p class="lead">This is the Doom analogue of <a href="https://huggingface.co/mlabonne/chessfly">chessfly</a>. We take a real <em>Drosophila</em> connectome — every neuron, every synapse, sign and strength — freeze the wiring, and let gradient descent tune only per-synapse gains and per-neuron homeostasis. Pixels go in through the fly's visual sensory neurons; actions come out of its central, descending and motor neurons. Every number on this page was computed from the connectome files that train the model.</p>
+<div id="kpis" class="grid g4" style="margin-top:22px"></div>
+
+<h2><span class="n">1</span>What a connectome is</h2>
+<p>A connectome is a wiring diagram of a nervous system reconstructed from electron microscopy: a directed graph whose nodes are neurons and whose edges are synaptic connections, each carrying a synapse count and a neurotransmitter-derived sign (excitatory or inhibitory). Below are 2-D PCA projections of the real 3-D soma positions of a random subset of neurons in each backbone. <span style="color:var(--in)">Blue</span> neurons receive Doom pixels; <span style="color:var(--out)">green</span> neurons are read out to choose an action.</p>
+<div id="maps" class="grid g2"></div>
+<div class="legend" style="margin-top:8px"><span><i style="background:var(--in)"></i>visual input neurons</span><span><i style="background:var(--out)"></i>readout neurons (central · descending · motor)</span><span><i style="background:var(--oth)"></i>everything else (still simulated)</span></div>
+
+<h2><span class="n">2</span>The wiring, in numbers</h2>
+<p>Real brains are sparse and heavy-tailed. Most neurons talk to a few dozen partners; a handful of hubs talk to thousands. Most synaptic connections are a single synapse; a few are hundreds strong. The network keeps both properties because we never add or remove an edge.</p>
+<div class="grid g2">
+  <div class="panel"><h3>Out-degree distribution (log–log)</h3><div id="deg"></div></div>
+  <div class="panel"><h3>Synapses per connection (log–log)</h3><div id="syn"></div></div>
+  <div class="panel"><h3>Excitatory vs inhibitory edges</h3><div id="ei"></div></div>
+  <div class="panel"><h3>Neuron super-classes</h3><div id="sc"></div></div>
+</div>
+
+<h2><span class="n">3</span>Two backbones, one model</h2>
+<p>The default backbone reproduces chessfly's recipe on the FlyWire FAFB v783 whole-brain release. The second is the MaleCNS 49k subset published on Hugging Face; it contains no optic lobe, so its "visual inputs" are the visual-projection and sensory neurons of the central brain instead of photoreceptor-side cells. Both are trained side by side as an ablation of <em>how much of the fly is needed</em>.</p>
+<div class="panel"><table id="cmp"></table></div>
+
+<h2><span class="n">4</span>How pixels become actions</h2>
+<div class="flow" id="flow"></div>
+<h3>The dynamics, one step</h3>
+<div class="eq" id="eq"></div>
+<p>Only three things are learned inside the brain: a scalar log-gain per synapse (the sign and the synapse count are fixed biology), and a per-neuron, per-step scale and shift on top of a running batch-normalisation of presynaptic drive — a cheap stand-in for homeostatic plasticity, and the same trick chessfly uses to keep 100k+ ReLU units from exploding or dying. Everything else (the convolutional stem that turns 4 stacked 72×96 frames into currents, the decoder, the two heads) is ordinary and small.</p>
+<div id="params" class="grid g2"></div>
+
+<h2><span class="n">5</span>The Doom side: 22 actions, 5 scenarios, legal-move masking</h2>
+<p>Chess has a 1968-move vocabulary with a legal-move mask per position. Doom's analogue is a global vocabulary of 22 button combinations with a per-scenario legality mask: <code>basic</code> may only strafe and shoot, <code>deadly_corridor</code> may do almost everything. The policy head always emits 22 logits; illegal ones are masked to −10⁴ before the softmax.</p>
+<div class="panel" style="overflow:auto"><table class="matrix" id="mat"></table></div>
+
+<h2><span class="n">6</span>Training: teacher, rollouts, distillation</h2>
+<p>Chessfly distils Stockfish-labelled positions. DoomFly has no Stockfish, so it makes its own teacher first. Everything runs unattended on one <code>g6e.12xlarge</code> (4× NVIDIA L40S, 48 GB each) in AWS <code>us-west-2</code>, launched by a CDK stack with no inbound ports (SSM only), logs mirrored to S3 every minute, and the box stops itself when done.</p>
+<div class="stage"><div class="num">0</div><div><b>Bootstrap.</b> Pull code + both connectome files from S3, reuse the Deep Learning AMI's PyTorch venv, install ViZDoom / gymnasium / SB3.</div></div>
+<div class="stage"><div class="num">1</div><div><b>Teachers.</b> Five PPO agents (SB3 <code>CnnPolicy</code>, 8 parallel envs each), one per scenario, one per GPU round-robin. These are the "Stockfish" of each map.</div></div>
+<div class="stage"><div class="num">2</div><div><b>Rollouts.</b> Each teacher plays its scenario ε-greedily (ε = 0.1) for 300k frames. We store the frame stack, the teacher's full action distribution (soft target), the discounted return, and the legality mask, as <code>.npz</code> shards.</div></div>
+<div class="stage"><div class="num">3</div><div><b>Distillation into the fly.</b> Two FlyNets train concurrently — FlyWire 783 on GPU 0, MaleCNS 49k on GPU 1 — with soft-target cross-entropy on the policy and a 64-bin categorical cross-entropy on the value (the chessfly/MuZero trick). Three AdamW groups: synaptic log-gains (lr 3e-3), homeostasis, and the rest (lr 3e-4); warm-up + cosine; bf16. Every few thousand steps the fly plays all five scenarios live and saves a GIF of its best episode.</div></div>
+<div class="stage"><div class="num">4</div><div><b>Wrap up.</b> Sync checkpoints, eval logs and GIFs to S3, then <code>shutdown -h now</code>.</div></div>
+<div class="grid g3" style="margin-top:10px">
+  <div class="panel"><h3>Policy loss</h3><div class="eq" style="font-size:15px">L<sub>π</sub> = − Σ<sub>a legal</sub> p<sub>teacher</sub>(a) · log p<sub>fly</sub>(a)</div><small style="color:var(--mute)">Soft targets carry the teacher's uncertainty, which matters when several actions are near-equivalent.</small></div>
+  <div class="panel"><h3>Value loss</h3><div class="eq" style="font-size:15px">L<sub>v</sub> = CE(bin(G<sub>t</sub>), v<sub>fly</sub>) over 64 bins</div><small style="color:var(--mute)">Return normalised per scenario to [0,1], then classified rather than regressed — stabler with heavy-tailed rewards.</small></div>
+  <div class="panel"><h3>GPU plan</h3><pre style="margin:0">stage 1-2: 5 jobs / 4 GPUs (i % 4)
+stage 3:   GPU0 flywire783
+           GPU1 malecns49k
+           GPU2-3 idle</pre></div>
+</div>
+
+<h2><span class="n">7</span>Reproduce</h2>
+<pre>uv sync
+python -m doomfly.connectome.build_flywire   # -> data/processed/connectome_783.npz
+python -m doomfly.connectome.build_malecns   # -> data/processed/connectome_malecns49k.npz
+cd infra && cdk bootstrap && cdk deploy      # fnp3 / us-west-2, g6e.12xlarge
+scripts/ship.sh                              # code + connectomes -> S3 (instance waits for this)
+scripts/status.sh                            # tail the mirrored logs
+STAGES="3 4" TRAIN_STEPS=80000 scripts/launch.sh   # re-run just the distillation later</pre>
+
+<footer id="foot"></footer>
+</main>
+<script>
+/*__DATA__*/
+const $=s=>document.querySelector(s), fmt=n=>n>=1e6?(n/1e6).toFixed(2)+"M":n>=1e3?Math.round(n).toLocaleString():String(n);
+const B=DATA.backbones, C=["var(--acc)","var(--in)"];
+const svg=(w,h)=>{const s=document.createElementNS("http://www.w3.org/2000/svg","svg");s.setAttribute("viewBox",`0 0 ${w} ${h}`);s.setAttribute("width","100%");return s};
+const el=(s,t,a)=>{const e=document.createElementNS("http://www.w3.org/2000/svg",t);for(const k in a)e.setAttribute(k,a[k]);s.appendChild(e);return e};
+const txt=(s,x,y,t,a={})=>{const e=el(s,"text",{x,y,...a});e.textContent=t;return e};
+
+// KPIs
+$("#kpis").innerHTML=B.map((b,i)=>`
+<div class="panel kpi" style="border-top:3px solid ${C[i]}"><div class="v">${fmt(b.neurons)}</div><div class="l">neurons · ${b.short}</div></div>
+<div class="panel kpi" style="border-top:3px solid ${C[i]}"><div class="v">${fmt(b.edges)}</div><div class="l">connections · ${fmt(b.synapses)} synapses</div></div>`).join("")+
+`<div class="panel kpi"><div class="v">${DATA.actions.length}</div><div class="l">Doom actions · ${Object.keys(DATA.scenarios).length} scenarios</div></div>
+<div class="panel kpi"><div class="v">${DATA.model_config.steps}</div><div class="l">recurrent steps per frame · leak ${DATA.model_config.leak}</div></div>`;
+
+// brain maps
+B.forEach((b,i)=>{const d=document.createElement("div");d.className="panel";d.innerHTML=`<h3>${b.label}</h3>`;const s=svg(500,380);
+ const col=["var(--oth)","var(--in)","var(--out)"],ord=[0,1,2];
+ for(const r of ord)b.map.role.forEach((rr,k)=>{if(rr!==r)return;el(s,"circle",{cx:20+b.map.x[k]*460,cy:360-b.map.y[k]*340,r:r?1.7:1.1,fill:col[r],opacity:r?.9:.45})});
+ txt(s,20,376,`${b.map.x.length.toLocaleString()} of ${b.neurons.toLocaleString()} neurons shown · ${b.inputs.toLocaleString()} inputs · ${b.readout.toLocaleString()} readout`,{class:"mute"});
+ d.appendChild(s);$("#maps").appendChild(d)});
+
+// log-log hist
+function loglog(target,key,xl){const s=svg(520,260),W=520,H=260,L=48,R=12,T=14,Bt=40;
+ const all=B.map(b=>b[key]);const xmax=Math.max(...all.map(h=>h.edges.at(-1))),ymax=Math.max(...all.flatMap(h=>h.counts));
+ const X=v=>L+Math.log10(Math.max(v,1))/Math.log10(xmax)*(W-L-R),Y=v=>H-Bt-Math.log10(Math.max(v,1))/Math.log10(ymax)*(H-T-Bt);
+ for(let p=0;p<=Math.log10(xmax);p++){el(s,"line",{x1:X(10**p),x2:X(10**p),y1:T,y2:H-Bt,class:"ax"});txt(s,X(10**p),H-Bt+16,"10"+"⁰¹²³⁴⁵"[p],{"text-anchor":"middle",class:"mute"})}
+ for(let p=0;p<=Math.log10(ymax);p++){el(s,"line",{x1:L,x2:W-R,y1:Y(10**p),y2:Y(10**p),class:"ax"});txt(s,L-6,Y(10**p)+4,"10"+"⁰¹²³⁴⁵⁶⁷"[p],{"text-anchor":"end",class:"mute"})}
+ all.forEach((h,i)=>{let d="";h.counts.forEach((c,k)=>{if(c<1)return;const x=X(Math.sqrt(h.edges[k]*h.edges[k+1])),y=Y(c);d+=(d?"L":"M")+x+","+y});el(s,"path",{d,fill:"none",stroke:C[i],"stroke-width":2.2});
+  h.counts.forEach((c,k)=>{if(c>=1)el(s,"circle",{cx:X(Math.sqrt(h.edges[k]*h.edges[k+1])),cy:Y(c),r:3,fill:C[i]})})});
+ txt(s,W/2,H-4,xl,{"text-anchor":"middle",class:"mute"});B.forEach((b,i)=>txt(s,W-R,T+14+i*16,b.short,{"text-anchor":"end",fill:C[i]}));$(target).appendChild(s)}
+loglog("#deg","outdeg_hist","outgoing connections per neuron");loglog("#syn","syn_hist","synapses per connection");
+
+// E/I
+{const s=svg(520,120);B.forEach((b,i)=>{const y=14+i*50,w=440,e=b.excitatory_fraction;el(s,"rect",{x:60,y,width:w*e,height:26,fill:C[i],rx:4});el(s,"rect",{x:60+w*e,y,width:w*(1-e),height:26,fill:"#2a2f3d",rx:4});
+ txt(s,60+8,y+18,`${(e*100).toFixed(1)}% excitatory`,{fill:"#000","font-weight":"700"});txt(s,60+w-8,y+18,`${((1-e)*100).toFixed(1)}% inhibitory`,{"text-anchor":"end",class:"mute"});txt(s,56,y+18,b.short.split(" ")[0],{"text-anchor":"end",class:"mute"})});$("#ei").appendChild(s)}
+
+// super-classes
+{const rows=[];B.forEach((b,i)=>b.super_class.forEach(([k,v])=>rows.push([i,k,v])));const mx=Math.max(...rows.map(r=>r[2]));const s=svg(520,18*rows.length+10);
+ rows.forEach(([i,k,v],j)=>{const y=6+j*18;el(s,"rect",{x:160,y,width:Math.max(2,(v/mx)*300),height:12,fill:C[i],rx:2,opacity:.85});txt(s,156,y+10,k,{"text-anchor":"end",class:"mute"});txt(s,166+(v/mx)*300,y+10,v.toLocaleString())});$("#sc").appendChild(s)}
+
+// compare table
+{const rows=[["source",b=>b.source_meta.dataset||b.source_meta.source],["neurons",b=>b.neurons.toLocaleString()],["connections (edges)",b=>b.edges.toLocaleString()],["synapses",b=>fmt(b.synapses)],
+ ["visual input neurons",b=>b.inputs.toLocaleString()],["readout neurons",b=>b.readout.toLocaleString()],["excitatory fraction",b=>(b.excitatory_fraction*100).toFixed(1)+"%"],["mean / median / max out-degree",b=>`${b.mean_out_degree.toFixed(1)} / ${b.median_out_degree} / ${b.max_out_degree.toLocaleString()}`],
+ ["graph density",b=>(b.density*100).toFixed(4)+"%"],["isolated neurons",b=>b.isolated.toLocaleString()],["trainable parameters",b=>fmt(b.params)],["license",b=>b.source_meta.license||"see references"]];
+ $("#cmp").innerHTML=`<tr><th></th>${B.map((b,i)=>`<th style="color:${C[i]}">${b.short}</th>`).join("")}</tr>`+rows.map(([n,f])=>`<tr><td>${n}</td>${B.map(b=>`<td>${f(b)}</td>`).join("")}</tr>`).join("")}
+
+// flow
+{const b=B[0],c=DATA.model_config;$("#flow").innerHTML=[
+ [`4 × 72×96 frames`,`uint8, frame-skip 4`],[`conv stem`,`${c.stem_width}-wide → linear → currents`],[`${b.inputs.toLocaleString()} visual neurons`,`u injected as external drive`,1],
+ [`${c.steps} steps of dynamics`,`over all ${b.neurons.toLocaleString()} neurons, ${fmt(b.edges)} fixed edges`,1],[`${b.readout.toLocaleString()} readout neurons`,`central · descending · motor`,1],
+ [`decoder ${c.d_model}-d`,`+ scenario embedding`],[`policy ${DATA.actions.length} · value ${c.n_value_bins}`,`legal-mask → softmax`]].map(([t,s,hot])=>`<div class="box ${hot?"hot":""}"><b>${t}</b><small>${s}</small></div>`).join('<div class="arrow">→</div>')}
+$("#eq").innerHTML=`drive<sub>t</sub> = W<sub>conn</sub> · h<sub>t</sub> + u &nbsp;&nbsp;&nbsp; W<sub>conn</sub>[j,i] = sign<sub>ij</sub> · syn<sub>ij</sub> · exp(g<sub>ij</sub>) &nbsp;&nbsp;<span class="mute" style="color:var(--mute)">(g learned, sign & syn fixed)</span><br>
+z<sub>t</sub> = scale<sub>t</sub> ⊙ BN<sub>t</sub>(drive<sub>t</sub>) + shift<sub>t</sub><br>
+h<sub>t+1</sub> = (1−α) h<sub>t</sub> + α · ReLU(z<sub>t</sub>) &nbsp;&nbsp;&nbsp; α = ${DATA.model_config.leak}, t = 0…${DATA.model_config.steps-1}`;
+
+// params
+B.forEach((b,i)=>{const d=document.createElement("div");d.className="panel";d.innerHTML=`<h3>${b.short}: ${fmt(b.params)} parameters</h3>`;const s=svg(520,90);const tot=b.params;let x=20;
+ const cols=[C[i],"var(--acc2)","#8a8f9c"];Object.entries(b.param_groups).forEach(([k,v],j)=>{const w=(v/tot)*480;el(s,"rect",{x,y:14,width:Math.max(w,1.5),height:28,fill:cols[j]});txt(s,20+j*170,72,`■ ${k}: ${fmt(v)} (${(v/tot*100).toFixed(1)}%)`,{fill:cols[j],"font-size":"11px"});x+=w});d.appendChild(s);$("#params").appendChild(d)});
+
+// action matrix
+{const sc=Object.entries(DATA.scenarios);const head=`<tr><th>#</th><th>buttons</th>${sc.map(([k])=>`<th>${k.replace(/_/g," ")}</th>`).join("")}</tr>`;
+ const legal=(k,a)=>a.every(b=>DATA.scenarios[k].buttons.includes(b));
+ $("#mat").innerHTML=head+DATA.actions.map((a,i)=>`<tr><td>${i}</td><td style="text-align:left"><code>${a.length?a.join(" + "):"no-op"}</code></td>${sc.map(([k])=>legal(k,a)?`<td class="on">●</td>`:`<td class="off">·</td>`).join("")}</tr>`).join("")+
+ `<tr><th>legal actions</th><th></th>${sc.map(([k,v])=>`<th>${v.n_legal}</th>`).join("")}</tr>`}
+
+$("#foot").innerHTML=`Generated by <code>tutorial/generate.py</code> from ${B.map(b=>`<code>data/processed/${b.key==="flywire783"?"connectome_783":"connectome_malecns49k"}.npz</code>`).join(" and ")}. References: ${B[0].source_meta.references.map(r=>`<a href="${r}">${r.replace("https://doi.org/","")}</a>`).join(", ")}; MaleCNS subset: <a href="https://huggingface.co/datasets/fernandofernandes/fly-connectome-49k">fernandofernandes/fly-connectome-49k</a> (${B[1].source_meta.license}). Model recipe after <a href="https://huggingface.co/mlabonne/chessfly">mlabonne/chessfly</a>.`;
+</script>
+</body></html>

@@ -1,0 +1,7 @@
+{
+  "app": "../.venv/bin/python app.py",
+  "context": {
+    "@aws-cdk/aws-iam:minimizePolicies": true,
+    "@aws-cdk/core:checkSecretUsage": true
+  }
+}
