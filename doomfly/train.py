@@ -106,6 +106,7 @@ def main():
     ap.add_argument("--connectome", type=Path, required=True)
     ap.add_argument("--rollouts", type=Path, required=True)
     ap.add_argument("--out", type=Path, required=True)
+    ap.add_argument("--tb", type=Path, default=None, help="TensorBoard log dir (optional)")
     ap.add_argument("--steps", type=int, default=60_000)
     ap.add_argument("--batch", type=int, default=256)
     ap.add_argument("--lr", type=float, default=3e-4)
@@ -161,6 +162,10 @@ def main():
         print(f"resumed from step {step0}", flush=True)
 
     log = open(a.out / "metrics.jsonl", "a")
+    tb = None
+    if a.tb:
+        from torch.utils.tensorboard import SummaryWriter
+        tb = SummaryWriter(str(a.tb))
     rng = np.random.default_rng(a.seed)
     use_bf16 = dev.type == "cuda"
     t0, tl = time.time(), time.time()
@@ -179,6 +184,15 @@ def main():
         res["step"] = step
         (a.out / "eval.jsonl").open("a").write(json.dumps(res) + "\n")
         print("EVAL", json.dumps(res), flush=True)
+        if tb is not None:
+            for k, v in res.items():
+                if isinstance(v, (int, float)) and k != "step":
+                    tb.add_scalar(f"eval/{k}", v, step)
+                elif isinstance(v, dict):
+                    for kk, vv in v.items():
+                        if isinstance(vv, (int, float)):
+                            tb.add_scalar(f"eval_{k}/{kk}", vv, step)
+            tb.flush()
         if a.s3:
             s3_sync(a.out, a.s3)
 
@@ -214,6 +228,11 @@ def main():
                 model.train()
             log.write(json.dumps(row) + "\n"); log.flush()
             print(json.dumps(row), flush=True)
+            if tb is not None:
+                for k, v in row.items():
+                    if k not in ("step", "wall"):
+                        tb.add_scalar(f"{'val' if k.startswith('val_') else 'train'}/{k}", v, step)
+                tb.add_scalar("train/wall_hours", row["wall"] / 3600, step)
         if step > 0 and step % a.ckpt_every == 0:
             save(step, "latest")
         if step > 0 and step % a.eval_every == 0 or step == a.steps:

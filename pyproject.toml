@@ -16,6 +16,7 @@ dependencies = [
     "tqdm>=4.66",
     "boto3>=1.34",
     "requests>=2.31",
+    "tensorboard>=2.16",
 ]
 
 [project.optional-dependencies]
