@@ -13,7 +13,8 @@ set -euo pipefail
 HOST=${HOST:-dev-dsk-fnp-2b-0822a465.us-west-2.amazon.com}
 PORT=${PORT:-8090}
 NAME=${NAME:-doomfly}
-ALLOW=${ALLOW:-posix:aws-velocity-labs}
+# default audience: aws-velocity-labs POSIX group + members of the #stallion-stan Slack channel (C0BMSC4D3TM, 2026-09-18)
+ALLOW=${ALLOW:-posix:aws-velocity-labs,opieter,murmeral,rycolez,pgrayy,lizrad,fjonatse,gauravaz,gsird,eshkuma,arielnab,zhalbert,okapl,tynoble,maxrat,traklord,tmoreton,alrichey,willismt,jonabuck,ncclegg,akhtrma,vivdalal,arron,maczas}
 REPO=/home/fnp/wd/doomfly
 SITE=/home/fnp/doomfly-site
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
