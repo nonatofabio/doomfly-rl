@@ -35,7 +35,9 @@ rs = os.environ.get("RUN_SCRIPT", "run_all.sh")
 ud = ud.replace("run_all.sh", rs)
 extra = os.environ.get("EXTRA_ENV", "").strip()
 if extra:
-    ud = ud.replace("export HOME=/root", "export HOME=/root\n" + "\n".join("export " + kv for kv in extra.split()), 1)
+    # single-quote values: they may contain shell metachars (| ; , spaces are still not allowed)
+    exports = ["export %s='%s'" % tuple(kv.split("=", 1)) for kv in extra.split()]
+    ud = ud.replace("export HOME=/root", "export HOME=/root\n" + "\n".join(exports), 1)
 print(ud, end="")
 PY
 
