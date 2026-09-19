@@ -71,10 +71,13 @@ what the wiring is worth as a prior once you let gradient descent in. Read a `do
 | `doomfly/model/` | `sparse.py` (sparse recurrent op), `flynet.py` (the model) |
 | `doomfly/doom/` | `env.py` (ViZDoom wrapper), `actions.py` (action vocabulary), `teacher.py` (PPO teachers), `record.py` (rollouts) |
 | `doomfly/train.py` | Distils the teachers into FlyNet. `--tb DIR` writes TensorBoard scalars |
-| `doomfly/evaluate.py` | Plays the trained model and writes GIFs |
+| `doomfly/grpo.py` | Critic-free GRPO / RLOO fine-tuning of a distilled student against a frozen reference |
+| `doomfly/evaluate.py` | Plays the trained model and writes GIF/MP4 footage (`--tics`, `--pick`, `--fmt`) |
 | `infra/` | CDK stack `DoomFly` (S3 bucket, launch template, IAM, ASG) in `us-west-2` |
 | `scripts/` | Ship, launch, watch (see below) |
 | `tutorial/` | `generate.py` + `template.html` -> `index.html` infographic |
+| `docs/` | Related work, GRPO study notes, harness findings |
+| `AGENTS.md` | What this project is for (harness capability test + GRPO study) and the rules agents follow |
 
 ## Pipeline on the GPU box
 

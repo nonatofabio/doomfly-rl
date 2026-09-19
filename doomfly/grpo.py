@@ -1,6 +1,6 @@
 """Critic-free in-env fine-tuning of a distilled FlyNet with GRPO / RLOO.
 
-Why no critic: FlyNet's value head is a 51-bin classifier bolted onto a sparse
+Why no critic: FlyNet's value head is a 64-bin classifier bolted onto a sparse
 connectome readout; it is the weakest part of the model and PPO's GAE leans on
 it hard. GRPO (Shao et al. 2024) replaces the learned baseline with the mean
 return of a *group* of episodes sampled from the same start state. Here a group
