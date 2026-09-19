@@ -13,7 +13,6 @@ dependencies = [
     "gymnasium>=0.29",
     "stable-baselines3>=2.3",
     "imageio>=2.34",
-    "pillow>=10.0",
     "tqdm>=4.66",
     "boto3>=1.34",
     "requests>=2.31",

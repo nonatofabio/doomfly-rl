@@ -62,7 +62,7 @@ def save_clip(path: Path, frames, fps: float, fmt: str = "gif"):
 
 
 def evaluate(model, legal, episodes=10, gif_dir: Path | None = None, device=torch.device("cpu"), scenarios=None, greedy=False,
-             *, tics=False, pick="best", fmt="gif", skin: str | None = None):
+             *, tics=False, pick="best", fmt="gif"):
     """pick: 'best' keeps the highest-return episode (train.py default), 'median' the middle one by
     return, 'all' writes every episode as <scenario>_ep<i>.<fmt>. tics=True records every game tic
     (35 fps) instead of one frame per decision (35/frame_skip fps)."""
@@ -73,7 +73,7 @@ def evaluate(model, legal, episodes=10, gif_dir: Path | None = None, device=torc
     record = gif_dir is not None
     for name in scenarios or list(SCENARIOS):
         sc = SCENARIOS[name]
-        env = DoomEnv(name, render=True, seed=12345, record_tics=tics and record, skin=skin)
+        env = DoomEnv(name, render=True, seed=12345, record_tics=tics and record)
         rets, lens, clips = [], [], []
         for ep in range(episodes):
             R, n, frames = play_episode(model, env, sc.id, legal[sc.id], device, greedy=greedy, record=record)
@@ -83,8 +83,6 @@ def evaluate(model, legal, episodes=10, gif_dir: Path | None = None, device=torc
         env.close()
         out[name] = {"mean_return": float(np.mean(rets)), "std_return": float(np.std(rets)),
                      "max_return": float(np.max(rets)), "mean_len": float(np.mean(lens))}
-        if skin is not None:
-            out[name]["skin"] = skin  # These returns use different policy input pixels.
         if record and any(clips):
             gif_dir.mkdir(parents=True, exist_ok=True)
             # 35 game tics/s; one frame per decision -> 35/frame_skip fps (8.75 at frame_skip 4)
@@ -116,8 +114,6 @@ if __name__ == "__main__":
     ap.add_argument("--episodes", type=int, default=10)
     ap.add_argument("--gif-dir", type=Path, default=None)
     ap.add_argument("--greedy", action="store_true")
-    ap.add_argument("--skin", choices=["fly-frog"], default=None,
-                    help="opt-in cosmetic mod; changes the pixels seen by the policy")
     ap.add_argument("--tics", action="store_true", help="record every game tic (35 fps) instead of one frame per decision")
     ap.add_argument("--pick", choices=["best", "median", "all"], default="best")
     ap.add_argument("--fmt", choices=["gif", "mp4"], default="gif")
@@ -129,4 +125,4 @@ if __name__ == "__main__":
     model = FlyNet(load_connectome(a.connectome), cfg).to(dev)
     model.load_state_dict(load_file(a.ckpt / "model.safetensors"))
     print(json.dumps(evaluate(model, legal_mask_table(dev), a.episodes, a.gif_dir, dev, scenarios=a.scenarios, greedy=a.greedy,
-                            tics=a.tics, pick=a.pick, fmt=a.fmt, skin=a.skin), indent=1))
+                            tics=a.tics, pick=a.pick, fmt=a.fmt), indent=1))
