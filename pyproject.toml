@@ -1,7 +1,7 @@
 [project]
-name = "doomfly"
+name = "doomfly-rl"
 version = "0.1.0"
-description = "The FlyWire fruit-fly connectome, trained to play Doom (a ChessFly analogue)."
+description = "doomfly-rl: the FlyWire fruit-fly connectome as an inductive bias for a Doom RL agent (a ChessFly analogue)."
 requires-python = ">=3.10,<3.13"
 dependencies = [
     "numpy>=1.26",

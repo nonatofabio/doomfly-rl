@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>DoomFly — a fruit-fly connectome learns to play Doom</title>
+<title>DoomFly-RL — a fruit-fly connectome learns to play Doom</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
 :root{--bg:#0b0d12;--panel:#141821;--ink:#e8e6df;--mute:#9aa0ad;--acc:#ff5a36;--acc2:#ffc857;--in:#4cc9f0;--out:#b5e853;--oth:#5b6070;--grid:#232838}
@@ -34,7 +34,7 @@ footer{margin-top:60px;color:var(--mute);font-size:13px}a{color:var(--in)}
 </head>
 <body><main>
 <div><span class="tag a">connectome-constrained RNN</span><span class="tag b">ViZDoom</span><span class="tag">policy distillation</span><span class="tag">2 backbones</span><span class="tag">critic-free GRPO</span></div>
-<h1>DoomFly: a <span>fruit-fly brain</span>, wired exactly as nature left it, learns to play Doom.</h1>
+<h1>DoomFly-RL: a <span>fruit-fly brain</span>, wired exactly as nature left it, learns to play Doom.</h1>
 <p class="lead">This is the Doom analogue of <a href="https://huggingface.co/mlabonne/chessfly">chessfly</a>. We take a real <em>Drosophila</em> connectome — every neuron, every synapse, sign and strength — freeze the wiring, and let gradient descent tune only per-synapse gains and per-neuron homeostasis. Pixels go in through the fly's visual sensory neurons; actions come out of its central, descending and motor neurons. Every number on this page was computed from the connectome files that train the model.</p>
 <figure class="hero"><video controls autoplay muted loop playsinline preload="metadata" src="assets/videos/doomfly_malecns49k_reel_web.mp4"></video><figcaption>The MaleCNS backbone (49,393 neurons, 48.2M trainable gains) playing all five scenarios — <em>basic</em>, <em>defend the center</em>, <em>defend the line</em>, <em>health gathering</em>, <em>deadly corridor</em> — after the full 60k distillation steps. Median of 10 evaluation episodes per scenario, every game tic recorded (35 fps), first and last frame held; 2:15, sound off. <em>basic</em> really is that short: the fly kills the monster in about six decisions (0.7 s of game time).</figcaption></figure>
 <div id="kpis" class="grid g4" style="margin-top:22px"></div>

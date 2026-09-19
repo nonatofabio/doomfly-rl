@@ -1,9 +1,9 @@
-# doomfly vs. nftechie/doomfly — same name, opposite question
+# doomfly-rl vs. nftechie/doomfly — same name, opposite question
 
 Two repositories are called `doomfly`. They are not forks of each other. This note records
 what each one is, where they differ, and what is worth borrowing. Snapshot taken 2026‑09‑18.
 
-- **This repo** — `nonatofabio/doomfly` (private, `fnp`). A neural network wired like a
+- **This repo** — `nonatofabio/doomfly`, to be renamed `doomfly-rl` (private, `fnp`). A neural network wired like a
   fruit‑fly brain, trained to play Doom, following the
   [mlabonne/chessfly](https://huggingface.co/mlabonne/chessfly) recipe.
 - **The other one** — `nftechie/doomfly` (public, 361 stars / 56 forks at snapshot time). A
@@ -63,9 +63,8 @@ Both take "fly brain plays Doom" literally, but they answer opposite questions.
   to `s3://doomfly-047472448415-us-west-2/site-assets/`; regenerate with `evaluate.py --tics`
   and `scripts/make_clips.sh` (see `tutorial/assets/videos/README.md`).
 
-## Suggested README line
+## In the README
 
-> Not to be confused with [nftechie/doomfly](https://github.com/nftechie/doomfly), which runs
-> the full MaleCNS connectome as a spiking network with fixed biological I/O and studies online
-> plasticity. This project trains a rate network constrained to the fly wiring diagram; see
-> `docs/related-work-nftechie-doomfly.md` for a comparison.
+The README (`# doomfly-rl`) carries a short disambiguation box at the top and a
+"Relation to nftechie/doomfly" section that explains why their design is coherent for their question
+and why ours differs. Keep the two in sync with this note.
