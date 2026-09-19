@@ -70,7 +70,7 @@ def sample_groups(model, envs, seeds, sid, legal_row, device, max_steps, tempera
         for j, k in enumerate(idx):
             o, r, done, _, _ = envs[k].step(g2l[int(act_np[j])])
             tr = traj[k]
-            tr["obs"].append(obs[k]); tr["act"].append(int(act_np[j])); tr["logp"].append(float(logp[j])); tr["rew"].append(r)
+            tr["obs"].append(obs[k].copy()); tr["act"].append(int(act_np[j])); tr["logp"].append(float(logp[j])); tr["rew"].append(r)
             obs[k] = o
             if done:
                 alive[k] = False
@@ -231,7 +231,10 @@ def main():
         adv = advantages(trajs, a.baseline, a.adv_norm)
         batch = flat_batch(trajs, adv)
         frames += len(batch[1])
-        model.train()
+        # Stay in eval mode: FlyNet has BatchNorm1d per recurrent step. train() would switch BN to batch
+        # statistics, so pi(a|s) at the update would differ from pi at sampling (ratio != 1 at step 0,
+        # every sample clipped) and the running stats would drift. Gradients flow fine in eval mode.
+        model.eval()
         ts = time.time()
         st = grpo_step(model, ref, opt, batch, sc.id, legal[sc.id], dev, a.clip, a.beta, a.ent_coef, a.epochs, a.minibatch)
         t_update = time.time() - ts
