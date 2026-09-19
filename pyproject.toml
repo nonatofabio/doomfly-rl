@@ -13,6 +13,7 @@ dependencies = [
     "gymnasium>=0.29",
     "stable-baselines3>=2.3",
     "imageio>=2.34",
+    "pillow>=10.0",
     "tqdm>=4.66",
     "boto3>=1.34",
     "requests>=2.31",
@@ -22,6 +23,7 @@ dependencies = [
 [project.optional-dependencies]
 infra = ["aws-cdk-lib>=2.150", "constructs>=10.3"]
 dev = ["pytest>=8"]
+video = ["imageio-ffmpeg>=0.4"]
 
 [build-system]
 requires = ["hatchling"]

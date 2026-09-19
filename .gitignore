@@ -20,3 +20,7 @@ node_modules/
 *.log
 tutorial/dist/
 _vizdoom.ini
+
+# rendered footage (hundreds of MB): regenerate with evaluate.py + scripts/make_clips.sh, backups in S3 site-assets/
+assets/videos/
+tutorial/assets/videos/*.mp4

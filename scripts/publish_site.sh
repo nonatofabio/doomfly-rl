@@ -24,7 +24,7 @@ sync() {
   ssh "$HOST" "mkdir -p $REPO"
   rsync -az --delete --stats \
     --exclude .venv --exclude data --exclude runs --exclude checkpoints --exclude .agent --exclude __pycache__ \
-    --exclude .DS_Store --exclude 'assets/videos/*/gif' \
+    --exclude .DS_Store --exclude 'assets/videos/*/gif' --exclude 'assets/videos/*/episodes' \
     "$ROOT/" "$HOST:$REPO/"
   ssh "$HOST" bash -s "$REPO" "$SITE" <<'EOF'
 set -e

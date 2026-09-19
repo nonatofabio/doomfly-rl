@@ -1,9 +1,15 @@
 """Live evaluation: let FlyNet play ViZDoom scenarios, report per-scenario mean
-episode return, and save a GIF of the best episode per scenario.
+episode return, and save footage of one (or every) episode per scenario.
 
 Usage (standalone):
   python -m doomfly.evaluate --ckpt runs/flywire783/final --connectome data/processed/connectome_783.npz \
       --episodes 10 --gif-dir runs/flywire783/gifs/final
+  # smooth 35 fps MP4 of the median episode (what the tutorial embeds):
+  python -m doomfly.evaluate ... --gif-dir out --tics --pick median --fmt mp4
+
+--pick   best (default; what train.py logs) | median | all (one file per episode)
+--tics   record every game tic inside the frame skip instead of one frame per decision
+--fmt    gif (default) | mp4 (needs the imageio-ffmpeg plugin: pip install doomfly[video])
 """
 from __future__ import annotations
 
@@ -23,6 +29,7 @@ from .doom.env import DoomEnv
 def play_episode(model, env: DoomEnv, sid: int, legal_row: torch.Tensor, device, greedy=False, record=False, max_steps=2100):
     obs, _ = env.reset()
     frames, R, done, n = [], 0.0, False, 0
+    record = record and not env.record_tics  # per-tic footage is collected by the env itself
     local = np.asarray(env.sc.actions)
     g2l = {int(g): i for i, g in enumerate(local)}
     while not done and n < max_steps:
@@ -35,29 +42,64 @@ def play_episode(model, env: DoomEnv, sid: int, legal_row: torch.Tensor, device,
         a = int(logits.argmax()) if greedy else int(torch.distributions.Categorical(logits=logits).sample())
         obs, r, done, _, _ = env.step(g2l[a])
         R += r; n += 1
+    if env.record_tics:
+        frames = list(env.tic_frames)
     return R, n, frames
 
 
-def evaluate(model, legal, episodes=10, gif_dir: Path | None = None, device=torch.device("cpu"), scenarios=None, greedy=False):
+def save_clip(path: Path, frames, fps: float, fmt: str = "gif"):
+    """Write frames as GIF (any imageio) or MP4 (needs imageio-ffmpeg). Returns the path written."""
+    path = path.with_suffix(f".{fmt}")
+    if fmt == "gif":
+        imageio.mimsave(path, frames, duration=1 / fps, loop=0)
+    else:
+        w = imageio.get_writer(path, fps=fps, codec="libx264", quality=8, pixelformat="yuv420p",
+                               output_params=["-movflags", "+faststart"], macro_block_size=None)
+        for f in frames:
+            w.append_data(f)
+        w.close()
+    return path
+
+
+def evaluate(model, legal, episodes=10, gif_dir: Path | None = None, device=torch.device("cpu"), scenarios=None, greedy=False,
+             *, tics=False, pick="best", fmt="gif", skin: str | None = None):
+    """pick: 'best' keeps the highest-return episode (train.py default), 'median' the middle one by
+    return, 'all' writes every episode as <scenario>_ep<i>.<fmt>. tics=True records every game tic
+    (35 fps) instead of one frame per decision (35/frame_skip fps)."""
+    assert pick in ("best", "median", "all"), pick
     was_training = model.training
     model.eval()
     out = {}
+    record = gif_dir is not None
     for name in scenarios or list(SCENARIOS):
         sc = SCENARIOS[name]
-        env = DoomEnv(name, render=True, seed=12345)
-        rets, lens, best = [], [], (-np.inf, None)
+        env = DoomEnv(name, render=True, seed=12345, record_tics=tics and record, skin=skin)
+        rets, lens, clips = [], [], []
         for ep in range(episodes):
-            R, n, frames = play_episode(model, env, sc.id, legal[sc.id], device, greedy=greedy, record=gif_dir is not None)
+            R, n, frames = play_episode(model, env, sc.id, legal[sc.id], device, greedy=greedy, record=record)
             rets.append(R); lens.append(n)
-            if R > best[0]:
-                best = (R, frames)
+            if record:
+                clips.append(frames)
         env.close()
         out[name] = {"mean_return": float(np.mean(rets)), "std_return": float(np.std(rets)),
                      "max_return": float(np.max(rets)), "mean_len": float(np.mean(lens))}
-        if gif_dir is not None and best[1]:
+        if skin is not None:
+            out[name]["skin"] = skin  # These returns use different policy input pixels.
+        if record and any(clips):
             gif_dir.mkdir(parents=True, exist_ok=True)
-            # 35 game tics/s with frame_skip 4 -> ~8.75 decisions/s; play back at that rate
-            imageio.mimsave(gif_dir / f"{name}.gif", best[1][::1], duration=1 / 8.75, loop=0)
+            # 35 game tics/s; one frame per decision -> 35/frame_skip fps (8.75 at frame_skip 4)
+            fps = 35.0 if tics else 35.0 / env.frame_skip
+            order = np.argsort(rets)  # ascending by return
+            if pick == "all":
+                for i, fr in enumerate(clips):
+                    save_clip(gif_dir / f"{name}_ep{i}", fr, fps, fmt)
+                out[name]["returns"] = [float(r) for r in rets]
+                out[name]["lens"] = [int(n) for n in lens]
+            else:
+                i = int(order[-1]) if pick == "best" else int(order[len(order) // 2])
+                save_clip(gif_dir / name, clips[i], fps, fmt)
+                out[name]["clip_episode"] = i
+                out[name]["clip_return"] = float(rets[i])
     if was_training:
         model.train()
     return out
@@ -74,10 +116,17 @@ if __name__ == "__main__":
     ap.add_argument("--episodes", type=int, default=10)
     ap.add_argument("--gif-dir", type=Path, default=None)
     ap.add_argument("--greedy", action="store_true")
+    ap.add_argument("--skin", choices=["fly-frog"], default=None,
+                    help="opt-in cosmetic mod; changes the pixels seen by the policy")
+    ap.add_argument("--tics", action="store_true", help="record every game tic (35 fps) instead of one frame per decision")
+    ap.add_argument("--pick", choices=["best", "median", "all"], default="best")
+    ap.add_argument("--fmt", choices=["gif", "mp4"], default="gif")
+    ap.add_argument("--scenarios", nargs="*", default=None)
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     a = ap.parse_args()
     dev = torch.device(a.device)
     cfg = FlyNetConfig(**json.loads((a.ckpt / "config.json").read_text())["flynet"])
     model = FlyNet(load_connectome(a.connectome), cfg).to(dev)
     model.load_state_dict(load_file(a.ckpt / "model.safetensors"))
-    print(json.dumps(evaluate(model, legal_mask_table(dev), a.episodes, a.gif_dir, dev, greedy=a.greedy), indent=1))
+    print(json.dumps(evaluate(model, legal_mask_table(dev), a.episodes, a.gif_dir, dev, scenarios=a.scenarios, greedy=a.greedy,
+                            tics=a.tics, pick=a.pick, fmt=a.fmt, skin=a.skin), indent=1))

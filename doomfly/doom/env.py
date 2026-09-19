@@ -35,9 +35,15 @@ def _resize_gray(img: np.ndarray) -> np.ndarray:
 class DoomEnv(gym.Env):
     metadata = {"render_modes": ["rgb_array"]}
 
-    def __init__(self, scenario: str | Scenario, frame_skip: int | None = None, render: bool = False, seed: int | None = None):
+    def __init__(self, scenario: str | Scenario, frame_skip: int | None = None, render: bool = False, seed: int | None = None,
+                 record_tics: bool = False):
         self.sc = SCENARIOS[scenario] if isinstance(scenario, str) else scenario
         self.frame_skip = frame_skip or self.sc.frame_skip
+        # record_tics: advance the engine one tic at a time inside the frame skip and keep every
+        # screen buffer in self.tic_frames (35 fps footage instead of one frame per decision).
+        # Same reward/observation semantics as make_action(a, frame_skip); only used for video.
+        self.record_tics = record_tics
+        self.tic_frames: list[np.ndarray] = []
         g = vzd.DoomGame()
         g.load_config(os.path.join(vzd.scenarios_path, self.sc.cfg))
         g.set_window_visible(False)
@@ -72,8 +78,11 @@ class DoomEnv(gym.Env):
             self.game.set_seed(int(seed))
         self.game.new_episode()
         self.frames.clear()
+        self.tic_frames.clear()
         st = self.game.get_state()
         self.last_rgb = st.screen_buffer
+        if self.record_tics:
+            self.tic_frames.append(st.screen_buffer)
         f = _resize_gray(st.screen_buffer)
         for _ in range(FRAME_STACK):
             self.frames.append(f)
@@ -81,7 +90,20 @@ class DoomEnv(gym.Env):
 
     def step(self, local_action: int):
         gidx = self.local_actions[int(local_action)]
-        r = self.game.make_action(action_to_buttons(self.sc, gidx), self.frame_skip)
+        buttons = action_to_buttons(self.sc, gidx)
+        if self.record_tics:
+            self.game.set_action(buttons)
+            r = 0.0
+            for _ in range(self.frame_skip):
+                self.game.advance_action(1, True)
+                r += self.game.get_last_reward()
+                st = self.game.get_state()
+                if st is not None:
+                    self.tic_frames.append(st.screen_buffer)
+                if self.game.is_episode_finished():
+                    break
+        else:
+            r = self.game.make_action(buttons, self.frame_skip)
         done = self.game.is_episode_finished()
         obs = np.stack(self.frames) if done else self._obs()
         return obs, float(r), done, False, {"global_action": gidx}
