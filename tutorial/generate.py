@@ -25,6 +25,28 @@ BACKBONES = {
 }
 RNG = np.random.default_rng(0)
 
+# Side-by-side footage (section 10): the two checkpoints, rendered by scripts/compare_clips.sh from the
+# eval_all.json of `python -m doomfly.evaluate --episodes 5 --pick all`. Numbers on the page come from those files.
+COMPARE = {
+    "backbone": "malecns49k", "slot": "malecns49k_student_vs_grpo",
+    "left": {"label": "distilled student (GRPO iter 0)", "dir": "assets/videos/malecns49k_student_iter0",
+             "ckpt": "l40s-v2/runs/malecns49k/final"},
+    "right": {"label": "GRPO <code>base</code>, iter 300", "dir": "assets/videos/malecns49k_grpo_base_iter300",
+              "ckpt": "grpo-use2/runs/malecns49k_grpo_base/final"},
+}
+
+
+def compare_stats():
+    """Per-scenario mean/std/returns for both sides, or None for a side whose eval has not finished."""
+    out = dict(COMPARE)
+    for side in ("left", "right"):
+        f = ROOT / COMPARE[side]["dir"] / "eval_all.json"
+        d = json.loads(f.read_text()) if f.exists() and f.stat().st_size else None  # empty while eval runs
+        out[side] = dict(COMPARE[side], eval=d and {k: {"mean": v["mean_return"], "std": v["std_return"],
+                                                          "returns": v.get("returns", []), "lens": v.get("lens", [])}
+                                                      for k, v in d.items()})
+    return out
+
 
 def log_hist(x, nb=24):
     x = x[x > 0]
@@ -85,6 +107,7 @@ def main():
         "scenarios": {k: {"n_legal": len(v.actions), "buttons": list(v.buttons), "frame_skip": v.frame_skip,
                           "ppo_steps": v.ppo_steps, "reward_scale": v.reward_scale, "shaping": v.shaping,
                           "doom_skill": v.doom_skill if v.doom_skill is not None else 5} for k, v in SCENARIOS.items()},
+        "compare": compare_stats(),
         "model_config": FlyNetConfig().__dict__,
         "frame": {"h": FRAME_H, "w": FRAME_W, "stack": FRAME_STACK, "bytes": FRAME_H * FRAME_W * FRAME_STACK},
         "rollout": {"frames_per_scenario": 300_000, "eps": 0.1, "gamma": GAMMA, "shard_frames": 20_000,

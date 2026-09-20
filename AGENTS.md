@@ -106,4 +106,4 @@ Both files may be empty or missing early on. Create them the first time you have
 | Fleet | `infra/` (CDK), `scripts/{ship,launch,launch_region,boxes,status,tb}.sh`, `scripts/run_all.sh` |
 | Site | `tutorial/`, `scripts/publish_site.sh {sync,start,status,stop}` |
 | Data | `data/processed/connectome_*.npz` (gitignored), `s3://…/connectomes/` |
-| Runs so far | `l40s-v2/{flywire783,malecns49k}`, `l40s-v2-b256/…`, `g6-12xl-use2/malecns49k`; local `checkpoints/malecns49k_v2_final` |
+| Runs so far | `l40s-v2/{flywire783,malecns49k}`, `l40s-v2-b256/…`, `g6-12xl-use2/malecns49k`; local `checkpoints/malecns49k_v2_final` (== `g6-12xl-use2-v2/runs/malecns49k/final`, not the GRPO student `l40s-v2/runs/malecns49k/final`; see `docs/grpo-study.md` §6a) |

@@ -168,6 +168,38 @@ Same for the runs that mark the corners:
    basic and deadly_corridor, and there the student is already at the teacher's level with
    nothing left for GRPO to add.
 
+## 6a. Side-by-side footage: student vs GRPO `base` iter 300
+
+Fresh CPU evals, 5 episodes per scenario, env seed 12345, stochastic policy, both checkpoints on
+the same MaleCNS 49k backbone (`--connectome data/processed/connectome_malecns49k.npz`). Left =
+`l40s-v2/runs/malecns49k/final` (the GRPO student, iter 0), right = `grpo-use2/runs/malecns49k_grpo_base/final`
+(iter 300). Per-episode clips and `eval_all.json` are in `assets/videos/malecns49k_student_iter0/` and
+`assets/videos/malecns49k_grpo_base_iter300/`; the hstack clips (median-return episode per side,
+labels burned in) come from `scripts/compare_clips.sh` and are section 10 of the tutorial page.
+
+| scenario | student iter 0 | GRPO `base` iter 300 | Δ mean | episodes (student / GRPO) |
+|---|---|---|---|---|
+| basic | 79.8 ± 4.7 | 79.8 ± 4.7 | +0.0 | identical returns and lengths on all 5 episodes |
+| defend_the_center | 18.0 ± 1.4 | 11.2 ± 1.8 | **−6.8** | 233–261 vs 161–207 decisions |
+| health_gathering | 1852.0 ± 496.0 | 2100.0 ± 0.0 | +248.0 | student had one 860 episode (died at 240 decisions); GRPO 5/5 at the 2100 timeout |
+| deadly_corridor | 2279.3 ± 0.8 | 2281.7 ± 2.3 | +2.4 | both at the corridor cap |
+| defend_the_line | 20.8 ± 4.1 | 26.0 ± 4.9 | +5.2 | 141–252 vs 182–323 decisions |
+
+The 5-episode numbers agree with the 10-episode §4 row for `base` in direction on every scenario
+(dtc down, hg and dtl up, basic and dc flat). What the footage adds on dtc: by ~20 s the GRPO side
+has spent all 26 rounds and stands at low health with an empty pistol while the student still has
+ammo; the shorter GRPO episodes (161–207 vs 233–261 decisions) are the same effect. A policy that fires more
+would cost on dtc (26 rounds, no pickups) and could pay on dtl; the dtl footage is consistent with
+that but 5 episodes cannot confirm it.
+
+**Checkpoint provenance.** `checkpoints/malecns49k_v2_final/model.safetensors` (the footage in
+tutorial sections 1–9 and the numbers in `docs/related-work-nftechie-doomfly.md`) is byte-identical to
+`s3://doomfly-047472448415-us-west-2/g6-12xl-use2-v2/runs/malecns49k/final/model.safetensors`
+(S3 multipart ETag `4143e256…-50` matches), not to `l40s-v2/runs/malecns49k/final`, which is the
+student every GRPO run started from. Both are step-60000 distillations with near-identical 10-episode
+evals but different weights. That is why the student side above was re-recorded from `l40s-v2`
+rather than reused from the existing footage.
+
 ## 7. Next single changes (one per run)
 
 - Adaptive β with a KL target of ~0.1 (`--kl-target`), starting from `base`.

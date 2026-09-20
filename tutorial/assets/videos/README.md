@@ -11,3 +11,9 @@ Not tracked in git (too large); regenerate with
 
 Status: malecns49k = v2 final (step 60k). flywire783 = interim v2 step 20k (best-of-10 GIF via
 scripts/pull_videos.sh); redo from `l40s-v2/runs/flywire783/final` when that run finishes.
+
+`malecns49k_student_vs_grpo_<scenario>.mp4` (1280x480, 35 fps; left = `l40s-v2/runs/malecns49k/final`,
+the GRPO student, right = `grpo-use2/runs/malecns49k_grpo_base/final`, GRPO iter 300; median-of-5
+episode each, labels burned in) come from `scripts/compare_clips.sh`; see section 10 of the page.
+Note `checkpoints/malecns49k_v2_final` (the footage above) is `g6-12xl-use2-v2/runs/malecns49k/final`,
+a sibling distillation run, not the GRPO student — hence the student side was re-recorded.
