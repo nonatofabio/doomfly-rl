@@ -1,7 +1,8 @@
 # Harness findings
 
 Bugs and gotchas found in the training/eval harness, with the symptom that exposed them. Keep
-this list short and concrete; one entry per finding.
+this list short and concrete; one entry per finding. Results (run table, GRPO vs. PPO
+comparison, conclusions) live in `docs/grpo-study.md`; this file is only about the harness.
 
 ## GRPO (`doomfly/grpo.py`)
 
