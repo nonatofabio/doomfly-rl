@@ -29,12 +29,14 @@ code,pre{font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace}pre{backgroun
 .matrix td.on{background:#22381a;color:var(--out);text-align:center}.matrix td.off{color:#3a3f4d;text-align:center}
 .vid{position:relative;background:#0d1017;border:1px solid var(--grid);border-radius:10px;aspect-ratio:4/3;overflow:hidden}.vid video{width:100%;height:100%;object-fit:contain;display:block}.vid .ph{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:var(--mute);font-size:13px;text-align:center;padding:12px}.vid .ph b{color:var(--acc2);font-size:15px}.vid.has .ph{display:none}.algo th,.algo td{text-align:left;vertical-align:top}
 footer{margin-top:60px;color:var(--mute);font-size:13px}a{color:var(--in)}
+.hero{margin:22px 0 0}.hero video{width:100%;aspect-ratio:4/3;background:#0d1017;border:1px solid var(--grid);border-radius:10px;display:block}.hero figcaption{margin-top:8px;color:var(--mute);font-size:13px;line-height:1.5}
 </style>
 </head>
 <body><main>
 <div><span class="tag a">connectome-constrained RNN</span><span class="tag b">ViZDoom</span><span class="tag">policy distillation</span><span class="tag">2 backbones</span><span class="tag">critic-free GRPO</span></div>
 <h1>DoomFly-RL: a <span>fruit-fly brain</span>, wired exactly as nature left it, learns to play Doom.</h1>
 <p class="lead">This is the Doom analogue of <a href="https://huggingface.co/mlabonne/chessfly">chessfly</a>. We take a real <em>Drosophila</em> connectome — every neuron, every synapse, sign and strength — freeze the wiring, and let gradient descent tune only per-synapse gains and per-neuron homeostasis. Pixels go in through the fly's visual sensory neurons; actions come out of its central, descending and motor neurons. Every number on this page was computed from the connectome files that train the model.</p>
+<figure class="hero"><video controls autoplay muted loop playsinline preload="metadata" src="assets/videos/doomfly_malecns49k_reel_web.mp4"></video><figcaption>The MaleCNS backbone (49,393 neurons, 48.2M trainable gains) playing all five scenarios — <em>basic</em>, <em>defend the center</em>, <em>defend the line</em>, <em>health gathering</em>, <em>deadly corridor</em> — after 60k distillation steps (checkpoint <code>malecns49k_v2_final</code>). Best of 10 evaluation episodes per scenario; 2:15, sound off.</figcaption></figure>
 <div id="kpis" class="grid g4" style="margin-top:22px"></div>
 
 <h2><span class="n">1</span>What a connectome is</h2>
