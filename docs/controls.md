@@ -8,10 +8,10 @@ warmup 1000, seed 0, 5 dynamic steps, eval every 5k on 10 episodes):
 
 | control | flag | what changes |
 |---|---|---|
-| `malecns49k_shuffled_s0` | `--shuffle-edges 0` | same 49,393 neurons, same 9,050,125 edges, edge endpoints shuffled degree-preserving (seed 0); all wiring structure destroyed, degree sequence kept |
+| `malecns49k_shuffled_s0`, `_s1` | `--shuffle-edges 0`, `1` | same 49,393 neurons, same 9,050,125 edges, edge endpoints shuffled degree-preserving (seeds 0 and 1); all wiring structure destroyed, degree sequence kept |
 | `malecns49k_noconn` | `--no-connectome` | stem → decoder directly; no neuron layer at all |
 
-Runs: `s3://doomfly-047472448415-us-west-2/controls-shuffled-s0/` and `…/controls-noconn/`
+Runs: `s3://doomfly-047472448415-us-west-2/controls-shuffled-s0/`, `…/controls-shuffled-s1/` and `…/controls-noconn/`
 (commit `6188701`, one g6e.8xlarge each, us-east-2c, 2026-09-21). Both finished with `fail=0` and self-terminated.
 
 ## Result at step 60,000 (10 eval episodes, mean ± std_return)
@@ -20,6 +20,7 @@ Runs: `s3://doomfly-047472448415-us-west-2/controls-shuffled-s0/` and `…/contr
 |---|---|---|---|---|---|---|---|---|---|---|
 | connectome (malecns49k, `pi_ref`) | 48.2 M | 646 | 3.66 h | 0.952 | 0.949 | 78.2±7.5 | 18.6±1.8 | 1728±616 | 2280.5±2.4 | 21.0±5.9 |
 | shuffled s0 | 48,160,765 | 1,454 | 1.68 h | 0.953 | 0.947 | 78.2±7.5 | 19.0±1.7 | 1602±597 | 2280.6±2.2 | 21.7±6.1 |
+| shuffled s1 | 48,160,765 | 1,453 | 1.68 h | 0.953 | 0.940 | 78.2±7.5 | 18.4±1.7 | 1921±268 | 2281.0±2.4 | 22.2±5.1 |
 | no-connectome | 27,729,030 | 14,686 | 0.29 h | 0.953 | 0.943 | 77.5±8.5 | 18.3±1.6 | 1373±555 | 2279.9±2.4 | 23.0±5.0 |
 
 Per-scenario validation top-1 agreement with the teacher at step 60k:
@@ -28,6 +29,7 @@ Per-scenario validation top-1 agreement with the teacher at step 60k:
 |---|---|---|---|---|---|
 | connectome | 0.987 | 0.959 | 0.971 | 0.916 | 0.913 |
 | shuffled s0 | 0.984 | 0.951 | 0.962 | 0.904 | 0.933 |
+| shuffled s1 | 0.979 | 0.954 | 0.949 | 0.906 | 0.913 |
 | no-connectome | 0.987 | 0.956 | 0.945 | 0.926 | 0.908 |
 
 Every difference is inside one standard deviation of the 10-episode eval. `basic` is bit-identical between
@@ -53,8 +55,9 @@ at 20k. The eval-over-training curves of the three runs overlap everywhere.
   saturated scenarios is a low bar; every backbone clears it. The free-play GRPO plan (`docs/freeplay-plan.md`)
   runs the same three backbones on Freedoom II MAP01 where the student starts far from optimal — that is
   where an inductive bias would show, if it exists.
-- One shuffle seed. `malecns49k_shuffled_s1` (`--shuffle-edges 1`) is queued to bound shuffle-seed variance;
-  given the numbers above it would need to move by >2σ to change the conclusion.
+- Two shuffle seeds. s0 and s1 differ from each other by less than either differs from the connectome run
+  (largest gap is `health_gathering`, 1602 vs 1921, inside one eval σ of ~600). Shuffle-seed variance does not
+  rescue the connectome.
 - No claim about the chessfly setting (different task, different training).
 
 ## Reproduce
