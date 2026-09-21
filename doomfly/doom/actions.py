@@ -14,6 +14,7 @@ import numpy as np
 B_ATTACK, B_USE, B_SPEED = "ATTACK", "USE", "SPEED"
 B_FWD, B_BACK, B_LEFT, B_RIGHT = "MOVE_FORWARD", "MOVE_BACKWARD", "MOVE_LEFT", "MOVE_RIGHT"
 B_TL, B_TR = "TURN_LEFT", "TURN_RIGHT"
+B_NEXTW = "SELECT_NEXT_WEAPON"
 
 # global vocabulary: tuples of buttons pressed together
 ACTIONS: list[tuple[str, ...]] = [
@@ -26,6 +27,7 @@ ACTIONS: list[tuple[str, ...]] = [
     (B_FWD, B_LEFT), (B_FWD, B_RIGHT),
     (B_FWD, B_SPEED), (B_FWD, B_TL, B_SPEED), (B_FWD, B_TR, B_SPEED),
     (B_USE,), (B_FWD, B_USE),
+    (B_NEXTW,),  # 22: added for free play (head surgery, docs/freeplay-plan.md step 2); no scenario uses it
 ]
 N_ACTIONS = len(ACTIONS)
 ACTION_INDEX = {a: i for i, a in enumerate(ACTIONS)}
@@ -75,13 +77,15 @@ for i, s in enumerate([
 
 N_SCENARIOS = len(SCENARIOS)
 
-# Free play on Freedoom II (ships with vizdoom). Deliberately NOT in SCENARIOS: it has no teacher,
-# no rollouts and no scenario embedding row; the model must borrow the id/legal-set of a trained
-# scenario (zero-shot) until a proper free-play head is added. Buttons = deadly_corridor's 7, the
-# widest set the distilled student was ever trained on (legal global actions 0..16).
-FREEPLAY = Scenario("freedoom2_map01", "freedoom2.cfg", (B_ATTACK, B_LEFT, B_RIGHT, B_FWD, B_BACK, B_TL, B_TR), (),
-                    doom_skill=3, doom_map="MAP01")
+# Free play on Freedoom II (ships with vizdoom). Deliberately NOT in SCENARIOS: it has no teacher and no
+# rollouts, so distillation never sees it and N_SCENARIOS stays 5. It owns scenario id N_SCENARIOS (the sixth
+# scenario_emb row, created by `doomfly.surgery` as the mean of the five trained rows) and the widest button
+# set: deadly_corridor's 7 (legal global actions 0..16) plus SELECT_NEXT_WEAPON (action 22).
+FREEPLAY = Scenario("freedoom2_map01", "freedoom2.cfg",
+                    (B_ATTACK, B_LEFT, B_RIGHT, B_FWD, B_BACK, B_TL, B_TR, B_NEXTW), (),
+                    doom_skill=3, doom_map="MAP01", id=N_SCENARIOS)
 FREEPLAY.actions = _legal(FREEPLAY.buttons)
+N_SCENARIO_IDS = N_SCENARIOS + 1  # rows in scenario_emb: the five trained scenarios + free play
 
 # game variables the env reports in info (order matters: indexes into state.game_variables)
 GAME_VARS = ("KILLCOUNT", "ITEMCOUNT", "SECRETCOUNT", "DAMAGECOUNT", "HEALTH", "ARMOR", "POSITION_X", "POSITION_Y")

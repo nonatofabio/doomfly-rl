@@ -33,12 +33,13 @@ from pathlib import Path
 import numpy as np
 import torch
 import torch.nn.functional as F
-from safetensors.torch import load_file, save_file
+from safetensors.torch import save_file
 
 from .doom.actions import SCENARIOS, N_ACTIONS
 from .doom.env import DoomEnv
 from .evaluate import evaluate
-from .model.flynet import FlyNet, FlyNetConfig, load_connectome
+from .model.flynet import FlyNet
+from .surgery import load_flynet
 from .train import legal_mask_table, s3_sync
 
 
@@ -153,10 +154,7 @@ def grpo_step(model, ref, opt, batch, sid, legal_row, device, clip=0.2, beta=0.0
 
 # ----------------------------------------------------------------------------- main
 def load_student(ckpt: Path, connectome: Path, device):
-    cfg = FlyNetConfig(**json.loads((ckpt / "config.json").read_text())["flynet"])
-    model = FlyNet(load_connectome(connectome), cfg).to(device)
-    model.load_state_dict(load_file(ckpt / "model.safetensors"))
-    return model, cfg
+    return load_flynet(ckpt, connectome, device)  # expands pre-surgery heads in memory
 
 
 def main():

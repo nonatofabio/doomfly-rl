@@ -25,14 +25,15 @@ import torch
 import torch.nn.functional as F
 from safetensors.torch import save_file, load_file
 
-from .doom.actions import SCENARIOS, N_ACTIONS, N_SCENARIOS
+from .doom.actions import SCENARIOS, FREEPLAY, N_ACTIONS, N_SCENARIO_IDS
 from .model.flynet import FlyNet, FlyNetConfig, load_connectome, value_to_bin
 from .evaluate import evaluate
 
 
 def legal_mask_table(device) -> torch.Tensor:
-    m = torch.zeros(N_SCENARIOS, N_ACTIONS, dtype=torch.bool)
-    for s in SCENARIOS.values():
+    """[N_SCENARIO_IDS, N_ACTIONS] bool: row = scenario id (the five trained scenarios + FREEPLAY)."""
+    m = torch.zeros(N_SCENARIO_IDS, N_ACTIONS, dtype=torch.bool)
+    for s in [*SCENARIOS.values(), FREEPLAY]:
         m[s.id, list(s.actions)] = True
     return m.to(device)
 
@@ -65,6 +66,9 @@ class Rollouts:
         self.frames = np.concatenate(frames)
         self.scen = np.concatenate(scen).astype(np.int64)
         self.teacher = np.concatenate(teacher)
+        if self.teacher.shape[1] < N_ACTIONS:  # rollouts recorded before the free-play head surgery (22 actions)
+            pad = np.zeros((len(self.teacher), N_ACTIONS - self.teacher.shape[1]), self.teacher.dtype)
+            self.teacher = np.concatenate([self.teacher, pad], 1)
         ret = np.concatenate(ret)
         lo = np.array([self.norm[s][0] for s in self.scen], np.float32)
         hi = np.array([self.norm[s][1] for s in self.scen], np.float32)
@@ -171,6 +175,8 @@ def main():
 
     step0 = 0
     if a.resume:
+        # same-shape resume only: a pre-surgery (22-action / 5-row) checkpoint also carries a mismatched
+        # optimizer state, so convert it with `python -m doomfly.surgery` and start a fresh run instead
         model.load_state_dict(load_file(a.resume / "model.safetensors"), strict=True)
         st = torch.load(a.resume / "opt.pt", map_location=dev)
         opt.load_state_dict(st["opt"]); step0 = st["step"]

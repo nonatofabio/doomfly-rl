@@ -104,8 +104,7 @@ def evaluate(model, legal, episodes=10, gif_dir: Path | None = None, device=torc
 
 
 if __name__ == "__main__":
-    from safetensors.torch import load_file
-    from .model.flynet import FlyNet, FlyNetConfig, load_connectome
+    from .surgery import load_flynet
     from .train import legal_mask_table
 
     ap = argparse.ArgumentParser()
@@ -121,8 +120,6 @@ if __name__ == "__main__":
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     a = ap.parse_args()
     dev = torch.device(a.device)
-    cfg = FlyNetConfig(**json.loads((a.ckpt / "config.json").read_text())["flynet"])
-    model = FlyNet(load_connectome(a.connectome), cfg).to(dev)
-    model.load_state_dict(load_file(a.ckpt / "model.safetensors"))
+    model, _ = load_flynet(a.ckpt, a.connectome, dev)
     print(json.dumps(evaluate(model, legal_mask_table(dev), a.episodes, a.gif_dir, dev, scenarios=a.scenarios, greedy=a.greedy,
                             tics=a.tics, pick=a.pick, fmt=a.fmt), indent=1))

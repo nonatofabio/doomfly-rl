@@ -7,7 +7,7 @@ Pipeline (mirrors mlabonne/chessfly):
          h <- (1-a) h + a * relu( gamma_t * norm(W h + u) + beta_t )
        W_ij = sign_ij * prior_ij * exp(theta_ij)  (wiring + sign frozen, gain learned)
     -> read the central-brain + descending + motor neurons (33,788)
-    -> policy head (22 global actions, legality mask per scenario)
+    -> policy head (23 global actions, legality mask per scenario)
     -> value head (64 bins over normalised return)
 """
 from __future__ import annotations
@@ -20,7 +20,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from .sparse import Connectome
-from ..doom.actions import N_ACTIONS, N_SCENARIOS
+from ..doom.actions import N_ACTIONS, N_SCENARIO_IDS
 
 FRAME_H, FRAME_W, FRAME_STACK = 72, 96, 4
 N_VALUE_BINS = 64
@@ -34,7 +34,7 @@ class FlyNetConfig:
     d_model: int = 512
     n_actions: int = N_ACTIONS
     n_value_bins: int = N_VALUE_BINS
-    n_scenarios: int = N_SCENARIOS
+    n_scenarios: int = N_SCENARIO_IDS  # five trained scenarios + the free-play row
     input_gain: float = 1.0
     # controls (docs/findings.md): -1 = real wiring; >= 0 = degree-preserving shuffle with that seed
     shuffle_seed: int = -1

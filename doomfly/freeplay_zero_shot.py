@@ -75,8 +75,7 @@ def summarise(rows: list[dict]) -> dict:
 
 
 def main():
-    from safetensors.torch import load_file
-    from .model.flynet import FlyNet, FlyNetConfig, load_connectome
+    from .surgery import load_flynet
 
     ap = argparse.ArgumentParser()
     ap.add_argument("--ckpt", type=Path, required=True)
@@ -92,9 +91,8 @@ def main():
     a = ap.parse_args()
 
     dev = torch.device(a.device)
-    cfg = FlyNetConfig(**json.loads((a.ckpt / "config.json").read_text())["flynet"])
-    model = FlyNet(load_connectome(a.connectome), cfg).to(dev).eval()
-    model.load_state_dict(load_file(a.ckpt / "model.safetensors"))
+    model, _ = load_flynet(a.ckpt, a.connectome, dev)
+    model.eval()
     rng = np.random.default_rng(a.seed)
     seeds = [int(s) for s in rng.integers(0, 2**31 - 1, size=a.episodes)]
 
