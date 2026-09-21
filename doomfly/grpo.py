@@ -38,7 +38,6 @@ from safetensors.torch import save_file
 from .doom.actions import SCENARIOS, N_ACTIONS
 from .doom.env import DoomEnv
 from .evaluate import evaluate
-from .model.flynet import FlyNet
 from .surgery import load_flynet
 from .train import legal_mask_table, s3_sync
 
