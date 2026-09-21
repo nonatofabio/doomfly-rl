@@ -1,6 +1,11 @@
 # doomfly-rl
 
-A neural network wired like a fruit-fly brain, trained with gradient descent to play Doom.
+A neural network wired like a fruit fly's brain, trained with gradient descent to play Doom.
+Built end to end by the [Strands harness](https://github.com/strands-agents/harness-sdk) in five
+days; the human typed about a dozen sentences. The story is in
+[this post](https://nonatofabio.github.io/blog/posts/doomfly_autonomous.html).
+
+[![MaleCNS-49k student playing the five ViZDoom scenarios](docs/img/reel_poster.jpg)](https://nonatofabio.github.io/blog/posts/doomfly_autonomous.html)
 
 > **Not [nftechie/doomfly](https://github.com/nftechie/doomfly).** That project runs the full
 > MaleCNS connectome as a spiking network with fixed, biology-motivated input and output, and
@@ -10,13 +15,86 @@ A neural network wired like a fruit-fly brain, trained with gradient descent to 
 > `docs/related-work-nftechie-doomfly.md` for the full comparison. The Python package is still
 > `doomfly`.
 
-The model (`FlyNet`) reuses the recipe of [mlabonne/chessfly](https://huggingface.co/mlabonne/chessfly):
-the recurrent core is the real connectome (FlyWire v783, 138,639 neurons, 15.09 M synapses), and training
-only learns one gain per synapse. Sign and weight class come from the biology. The visual input neurons
-receive the game frame, the output is read from the descending neurons, and a small decoder turns that
-into one of 22 Doom actions. A second, smaller backbone (`malecns49k`, 49,393 neurons) is trained as an ablation.
+## Results in one screen
 
-Read `tutorial/index.html` for the full, self-contained walkthrough (open it in a browser, no server).
+Two negative results, both reproducible from checkpoints in S3 or on Hugging Face.
+
+**The connectome carries no measurable inductive bias on the five ViZDoom scenarios.**
+Same distillation recipe, 60k steps, 10-episode eval at the end (`docs/controls.md`):
+
+| Backbone | Params | Train steps/s | basic | defend_the_center | health_gathering | deadly_corridor | defend_the_line |
+|---|---|---|---|---|---|---|---|
+| MaleCNS-49k connectome | 48.2 M | 646 | 78.2 ± 7.5 | 18.6 ± 1.8 | 1728 ± 616 | 2280.5 ± 2.4 | 21.0 ± 5.9 |
+| same graph, edges shuffled (degree-preserving, seed 0) | 48.2 M | 1,454 | 78.2 ± 7.5 | 19.0 ± 1.7 | 1602 ± 597 | 2280.6 ± 2.2 | 21.7 ± 6.1 |
+| same graph, edges shuffled (seed 1) | 48.2 M | 1,453 | 78.2 ± 7.5 | 18.4 ± 1.7 | 1921 ± 268 | 2281.0 ± 2.4 | 22.2 ± 5.1 |
+| no connectome (stem → decoder) | 27.7 M | 14,686 | 77.5 ± 8.5 | 18.3 ± 1.6 | 1373 ± 555 | 2279.9 ± 2.4 | 23.0 ± 5.0 |
+
+Every gap is inside one eval standard deviation. The wiring makes training 22× slower and buys nothing here.
+
+**Critic-free GRPO does not improve the distilled student.** Twelve runs, one knob per run, 300
+iterations each: no run beats the student outside eval noise on any scenario, and seven of twelve
+regress `defend_the_center` by more than two standard deviations. The KL penalty to the frozen
+student is the only load-bearing knob, and the strength that stops the drift also stops any gain
+(`docs/grpo-study.md`).
+
+Read a `doomfly-rl` score as "connectome-constrained RL agent", never as "a fly".
+
+## Try the trained models
+
+Checkpoints and the connectome file they need are on Hugging Face:
+[nonatofabio/doomfly-rl](https://huggingface.co/nonatofabio/doomfly-rl).
+
+```bash
+uv venv && uv pip install -e . huggingface_hub
+hf download nonatofabio/doomfly-rl --local-dir hf
+python -m doomfly.evaluate --ckpt hf/malecns49k_v2_final --connectome hf/connectome_malecns49k.npz \
+    --episodes 10 --gif-dir /tmp/clips --tics --pick median --fmt mp4 --device cpu
+```
+
+Three checkpoints, all step 60,000 of the same recipe: `malecns49k_v2_final` (real connectome,
+the footage above), `malecns49k_shuffled_s0` (degree-preserving shuffle), `malecns49k_noconn`
+(no neuron layer). Loading goes through `doomfly.surgery.load_flynet`, which widens the old
+22-action, 5-scenario head to 23/6 in memory so the checkpoints also run in free play.
+
+## What the model is
+
+`FlyNet` reuses the recipe of [mlabonne/chessfly](https://huggingface.co/mlabonne/chessfly): the
+recurrent core is a real connectome, the wiring and the sign of every synapse are frozen, and
+training learns one gain per synapse. Around it sit ordinary learned modules: a conv stem turns a
+4-frame 72×96 grayscale stack into input currents on the visual sensory neurons, the network
+unrolls 5 steps, and a readout takes the central, descending and motor neurons to 512 units and
+then to one of 22 actions (23 after free-play surgery) with a per-scenario legality mask.
+
+Two backbones: FlyWire FAFB v783 (138,639 neurons, 15.09 M edges, 54.5 M synapses) and a
+49,393-neuron MaleCNS subgraph (9.05 M edges) from
+[fernandofernandes/fly-connectome-49k](https://huggingface.co/datasets/fernandofernandes/fly-connectome-49k),
+CC BY 4.0. Parameter counts for FlyWire-783:
+
+| Component | Parameters |
+|---|---|
+| Synaptic log-gains (the connectome) | 15,091,983 |
+| Homeostatic scale/shift | 1,386,390 |
+| Stem, decoder, policy and value heads | 34,538,493 |
+| **Total** | **51,016,866** |
+
+Two thirds of the model is a conv net and an MLP, which is why the controls above exist.
+
+Training: PPO teachers (one per scenario, Stable-Baselines3) → ε-greedy rollouts → distillation
+into FlyNet → optional GRPO/RLOO fine-tuning against the frozen student.
+
+## Roadmap
+
+- **Free play on Freedoom II MAP01.** Zero-shot baselines are in `docs/freeplay.md`: the student
+  survives 2.2× longer than random with its aiming prior and still dies in 8/10 episodes without
+  leaving the first two rooms. Head surgery for `SELECT_NEXT_WEAPON` and a sixth scenario
+  embedding is done and tested (`tests/test_surgery.py`). Next: GRPO on MAP01 with shaped reward
+  on all three backbones, because a wiring prior would show where the policy has to learn rather
+  than imitate (`docs/freeplay-plan.md`).
+- **Fly vs fly.** ViZDoom duel with frozen-snapshot opponents and Elo, only if free play learns.
+- **GRPO follow-ups.** Adaptive β with a KL target, 50-episode evals, greedy eval of the three
+  teachers that have no curve.
+- **Tutorial page.** `tutorial/index.html` is a self-contained walkthrough with hover-to-play
+  footage; publishing it publicly is pending.
 
 ## Relation to nftechie/doomfly
 
@@ -44,24 +122,20 @@ levers is what makes "no learning demonstrated" a meaningful result rather than 
 **Why we do it differently.** `doomfly-rl` asks the ML question instead: if a recurrent network is
 constrained to the fly's connectivity and synapse signs, can optimisation make it play, and how does
 that compare with the same recipe on chess (`chessfly`)? Here the connectome is a structural prior, not
-a claim about biology. Consequences we accept:
-
-- The stem (4×72×96 frames → 10,855 visual neurons), the readout (33,788 central/descending neurons →
-  512 → 22 actions) and the 64-bin value head are ordinary learned modules, 34.5 M of the 51.0 M
-  parameters. They do real work. Any claim about "the fly brain" playing has to be read net of them,
-  which is why the ablation backbone and the per-component parameter counts are reported.
-- Dynamics are rate units unrolled for 5 steps with BatchNorm and homeostatic scale/shift, not spikes
-  with millisecond time constants. This trains on a GPU in hours; a spiking simulation of the same graph
-  runs at 0.16× wall time on their hardware.
-- Learning is offline (PPO teachers → ε-greedy rollouts → distillation, optionally GRPO/RLOO), on the
-  five standard ViZDoom scenarios, so results are comparable across backbones and to published RL
-  baselines.
-- We prune to the FlyWire v783 graph with class labels, and build a 49k-neuron MaleCNS subgraph as an
-  ablation. Their contract disallows exactly this.
+a claim about biology. The controls in `docs/controls.md` are the answer so far: on these scenarios,
+the prior is worth nothing measurable.
 
 Neither project invalidates the other. Theirs tells you what the wiring does on its own; ours tells you
-what the wiring is worth as a prior once you let gradient descent in. Read a `doomfly-rl` score as
-"connectome-constrained RL agent", never as "a fly".
+what the wiring is worth as a prior once you let gradient descent in.
+
+## How it was built
+
+Every commit in this repo was written by the Strands harness working from `AGENTS.md`, which says
+what the project is for, what it is not, and the rules that keep results honest: every number
+traces to a checkpoint, one change per run, negative results go in `docs/`, no push or launch
+without being told. `docs/harness-findings.md` lists what broke along the way (cuSPARSE has no
+mixed-dtype kernels, `nvidia-smi | head` under `pipefail`, an unquoted `|` in cloud-init, a
+BatchNorm train/eval mismatch caught by a CPU smoke test before the first GPU run).
 
 ## Layout
 
@@ -72,12 +146,14 @@ what the wiring is worth as a prior once you let gradient descent in. Read a `do
 | `doomfly/doom/` | `env.py` (ViZDoom wrapper), `actions.py` (action vocabulary), `teacher.py` (PPO teachers), `record.py` (rollouts) |
 | `doomfly/train.py` | Distils the teachers into FlyNet. `--tb DIR` writes TensorBoard scalars |
 | `doomfly/grpo.py` | Critic-free GRPO / RLOO fine-tuning of a distilled student against a frozen reference |
+| `doomfly/surgery.py` | Widens a trained head for free play; `load_flynet` is the one checkpoint loader |
+| `doomfly/freeplay_zero_shot.py` | Zero-shot evaluation on Freedoom II MAP01 |
 | `doomfly/evaluate.py` | Plays the trained model and writes GIF/MP4 footage (`--tics`, `--pick`, `--fmt`) |
 | `infra/` | CDK stack `DoomFly` (S3 bucket, launch template, IAM, ASG) in `us-west-2` |
-| `scripts/` | Ship, launch, watch (see below) |
+| `scripts/` | Ship, launch, watch, clips, publish (see below) |
 | `tutorial/` | `generate.py` + `template.html` -> `index.html` infographic |
-| `docs/` | Related work, GRPO study notes, harness findings |
-| `AGENTS.md` | What this project is for (harness capability test + GRPO study) and the rules agents follow |
+| `docs/` | Controls, GRPO study, free play, related work, harness findings |
+| `AGENTS.md` | What this project is for and the rules agents follow |
 
 ## Pipeline on the GPU box
 
@@ -117,3 +193,10 @@ python -m doomfly.train --connectome data/processed/connectome_783.npz --rollout
     --tb /tmp/tb/train --steps 60 --batch 8 --device cpu
 tensorboard --logdir /tmp/tb
 ```
+
+## License and data
+
+Code and weights: MIT (`LICENSE`). The MaleCNS-49k connectome derives from
+[fernandofernandes/fly-connectome-49k](https://huggingface.co/datasets/fernandofernandes/fly-connectome-49k)
+(CC BY 4.0). The FlyWire v783 graph derives from the Shiu et al. author release; see
+`data/processed/connectome_783.json` for source hashes and references.
