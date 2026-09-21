@@ -9,7 +9,7 @@ import numpy as np
 import vizdoom as vzd
 from gymnasium import spaces
 
-from .actions import SCENARIOS, Scenario, action_to_buttons, ACTIONS
+from .actions import SCENARIOS, Scenario, action_to_buttons, ACTIONS, GAME_VARS
 
 FRAME_H, FRAME_W, FRAME_STACK = 72, 96, 4
 
@@ -52,6 +52,11 @@ class DoomEnv(gym.Env):
         g.set_available_buttons([getattr(vzd.Button, b) for b in self.sc.buttons])
         g.set_mode(vzd.Mode.PLAYER)
         g.set_render_hud(True)
+        if self.sc.doom_map is not None:  # free play on a full WAD level
+            g.set_doom_map(self.sc.doom_map)
+            g.set_audio_buffer_enabled(False)
+            g.set_automap_buffer_enabled(False)
+            g.set_available_game_variables([getattr(vzd.GameVariable, v) for v in GAME_VARS])
         if self.sc.doom_skill is not None:
             g.set_doom_skill(self.sc.doom_skill)
         if seed is not None:
@@ -64,6 +69,7 @@ class DoomEnv(gym.Env):
         self.observation_space = spaces.Box(0, 255, (FRAME_STACK, FRAME_H, FRAME_W), np.uint8)
         self.frames = deque(maxlen=FRAME_STACK)
         self.last_rgb = None
+        self.last_vars = np.zeros(len(GAME_VARS))
 
     def _obs(self):
         st = self.game.get_state()
@@ -106,7 +112,14 @@ class DoomEnv(gym.Env):
             r = self.game.make_action(buttons, self.frame_skip)
         done = self.game.is_episode_finished()
         obs = np.stack(self.frames) if done else self._obs()
-        return obs, float(r), done, False, {"global_action": gidx}
+        info = {"global_action": gidx}
+        if self.sc.doom_map is not None:
+            st = self.game.get_state()
+            if st is not None:
+                self.last_vars = st.game_variables
+            info["vars"] = dict(zip(GAME_VARS, map(float, self.last_vars)))
+            info["dead"] = bool(self.game.is_player_dead())
+        return obs, float(r), done, False, info
 
     def render(self):
         return self.last_rgb

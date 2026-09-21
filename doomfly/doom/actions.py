@@ -49,6 +49,9 @@ class Scenario:
     shaping: bool = False
     # applied in the env itself (teacher, recorder, eval all see it). None = scenario .cfg default (5).
     doom_skill: int | None = None
+    # free play on a full WAD level (None = the scenario .cfg's own map). Env disables audio/automap
+    # buffers and exposes GAME_VARS in info; frees us from writing a new .cfg per level.
+    doom_map: str | None = None
     id: int = field(default=-1)
 
 
@@ -71,6 +74,17 @@ for i, s in enumerate([
     SCENARIOS[s.name] = s
 
 N_SCENARIOS = len(SCENARIOS)
+
+# Free play on Freedoom II (ships with vizdoom). Deliberately NOT in SCENARIOS: it has no teacher,
+# no rollouts and no scenario embedding row; the model must borrow the id/legal-set of a trained
+# scenario (zero-shot) until a proper free-play head is added. Buttons = deadly_corridor's 7, the
+# widest set the distilled student was ever trained on (legal global actions 0..16).
+FREEPLAY = Scenario("freedoom2_map01", "freedoom2.cfg", (B_ATTACK, B_LEFT, B_RIGHT, B_FWD, B_BACK, B_TL, B_TR), (),
+                    doom_skill=3, doom_map="MAP01")
+FREEPLAY.actions = _legal(FREEPLAY.buttons)
+
+# game variables the env reports in info (order matters: indexes into state.game_variables)
+GAME_VARS = ("KILLCOUNT", "ITEMCOUNT", "SECRETCOUNT", "DAMAGECOUNT", "HEALTH", "ARMOR", "POSITION_X", "POSITION_Y")
 
 
 def legal_mask(scenario: Scenario) -> np.ndarray:
