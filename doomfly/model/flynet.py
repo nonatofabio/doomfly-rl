@@ -36,6 +36,44 @@ class FlyNetConfig:
     n_value_bins: int = N_VALUE_BINS
     n_scenarios: int = N_SCENARIOS
     input_gain: float = 1.0
+    # controls (docs/findings.md): -1 = real wiring; >= 0 = degree-preserving shuffle with that seed
+    shuffle_seed: int = -1
+    # stem -> decoder directly, no neurons, no dynamics (same stem/heads, decoder reads the stem output)
+    no_connectome: bool = False
+
+
+def shuffle_connectome(conn: dict, seed: int, max_rounds: int = 200) -> dict:
+    """Degree-preserving null model of the wiring.
+
+    Keeps `dst` fixed (exact in-degree per neuron) and permutes the presynaptic column together
+    with its sign (exact out-degree per neuron, sign stays with the neuron that emits it);
+    `syn_count` stays with the postsynaptic slot, so per-neuron input weight mass is unchanged.
+    Input / readout neuron sets are untouched.  Duplicate (dst, src) pairs created by the
+    permutation are resolved by re-permuting `src` among the colliding edges only, so both
+    degree sequences are exact; whatever is still colliding after `max_rounds` is dropped.
+    Self-loops are kept.
+    """
+    g = np.random.default_rng(seed)
+    src, dst = np.asarray(conn["src"]).copy(), np.asarray(conn["dst"])
+    sign, syn = np.asarray(conn["sign"]).copy(), np.asarray(conn["syn_count"])
+    n = int(conn["n"])
+    perm = g.permutation(len(src))
+    src, sign = src[perm], sign[perm]
+    dst64 = dst.astype(np.int64) * n
+    for _ in range(max_rounds):
+        _, first = np.unique(dst64 + src, return_index=True)
+        dup = np.ones(len(src), bool); dup[first] = False
+        idx = np.flatnonzero(dup)
+        if len(idx) == 0:
+            break
+        p = g.permutation(len(idx))
+        src[idx], sign[idx] = src[idx][p], sign[idx][p]
+    _, keep = np.unique(dst64 + src, return_index=True)
+    keep.sort()
+    out = dict(conn)
+    out.update(src=src[keep], dst=dst[keep], sign=sign[keep], syn_count=syn[keep])
+    out["shuffled"] = np.array([seed, len(src) - len(keep)])  # seed, dropped duplicates
+    return out
 
 
 class Stem(nn.Module):
@@ -64,7 +102,11 @@ class FlyNet(nn.Module):
         self.cfg = cfg
         n = int(connectome["n"])
         self.n = n
-        self.connectome = Connectome(connectome["src"], connectome["dst"], connectome["sign"], connectome["syn_count"], n)
+        if cfg.shuffle_seed >= 0 and not cfg.no_connectome:
+            connectome = shuffle_connectome(connectome, cfg.shuffle_seed)
+        self.n_dropped = int(connectome["shuffled"][1]) if "shuffled" in connectome else 0
+        self.connectome = None if cfg.no_connectome else Connectome(
+            connectome["src"], connectome["dst"], connectome["sign"], connectome["syn_count"], n)
         input_idx = torch.as_tensor(np.flatnonzero(connectome["is_input"]), dtype=torch.long)
         readout_idx = torch.as_tensor(np.flatnonzero(connectome["is_readout"]), dtype=torch.long)
         self.register_buffer("input_idx", input_idx)
@@ -72,13 +114,19 @@ class FlyNet(nn.Module):
         self.n_inputs, self.n_readout = len(input_idx), len(readout_idx)
 
         self.encoder = Stem(self.n_inputs, cfg.stem_width)
-        # homeostatic per-neuron, per-step gain (scale) and threshold (shift), on top of a
-        # non-affine batch-norm of the presynaptic drive (mu, sigma tracked as running stats)
-        self.scale = nn.Parameter(torch.ones(cfg.steps, n))
-        self.shift = nn.Parameter(torch.zeros(cfg.steps, n))
-        self.norms = nn.ModuleList([nn.BatchNorm1d(n, affine=False, momentum=0.05) for _ in range(cfg.steps)])
+        if cfg.no_connectome:
+            # no neurons: the decoder reads the stem's n_inputs currents directly
+            self.norms = nn.ModuleList()
+            dec_in = self.n_inputs
+        else:
+            # homeostatic per-neuron, per-step gain (scale) and threshold (shift), on top of a
+            # non-affine batch-norm of the presynaptic drive (mu, sigma tracked as running stats)
+            self.scale = nn.Parameter(torch.ones(cfg.steps, n))
+            self.shift = nn.Parameter(torch.zeros(cfg.steps, n))
+            self.norms = nn.ModuleList([nn.BatchNorm1d(n, affine=False, momentum=0.05) for _ in range(cfg.steps)])
+            dec_in = self.n_readout
         self.scenario_emb = nn.Embedding(cfg.n_scenarios, cfg.d_model)
-        self.decoder = nn.Sequential(nn.Linear(self.n_readout, cfg.d_model), nn.GELU(), nn.LayerNorm(cfg.d_model))
+        self.decoder = nn.Sequential(nn.Linear(dec_in, cfg.d_model), nn.GELU(), nn.LayerNorm(cfg.d_model))
         self.heads = nn.ModuleDict({
             "policy": nn.Sequential(nn.Linear(cfg.d_model, cfg.d_model), nn.GELU(), nn.Linear(cfg.d_model, cfg.n_actions)),
             "value": nn.Sequential(nn.Linear(cfg.d_model, cfg.d_model), nn.GELU(), nn.Linear(cfg.d_model, cfg.n_value_bins)),
@@ -103,9 +151,12 @@ class FlyNet(nn.Module):
 
     def forward(self, frames, scenario_id, legal_mask=None, return_trace=False):
         u_in = self.encoder(frames)
-        out = self.dynamics(u_in, return_trace)
-        h, trace = out if return_trace else (out, None)
-        r = h[self.readout_idx].t()                             # [B, n_readout]
+        if self.cfg.no_connectome:
+            r, trace = u_in.float(), None                       # [B, n_inputs]: stem -> decoder
+        else:
+            out = self.dynamics(u_in, return_trace)
+            h, trace = out if return_trace else (out, None)
+            r = h[self.readout_idx].t()                         # [B, n_readout]
         z = self.decoder(r) + self.scenario_emb(scenario_id)
         logits = self.heads["policy"](z)
         if legal_mask is not None:
@@ -117,15 +168,17 @@ class FlyNet(nn.Module):
         return res
 
     def param_groups(self):
-        conn = [self.connectome.log_gain]
-        homeo = [self.scale, self.shift]
+        conn = [] if self.connectome is None else [self.connectome.log_gain]
+        homeo = [] if self.connectome is None else [self.scale, self.shift]
         ids = {id(p) for p in conn + homeo}
         rest = [p for p in self.parameters() if id(p) not in ids]
         return conn, homeo, rest
 
     def meta(self):
-        return {"config": asdict(self.cfg), "neurons": self.n, "edges": int(self.connectome.log_gain.numel()),
-                "inputs": self.n_inputs, "readout": self.n_readout,
+        edges = 0 if self.connectome is None else int(self.connectome.log_gain.numel())
+        return {"config": asdict(self.cfg), "neurons": 0 if self.connectome is None else self.n, "edges": edges,
+                "dropped_duplicates": self.n_dropped, "inputs": self.n_inputs,
+                "readout": self.n_inputs if self.connectome is None else self.n_readout,
                 "params": sum(p.numel() for p in self.parameters())}
 
 

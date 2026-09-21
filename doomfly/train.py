@@ -134,6 +134,9 @@ def main():
     ap.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--steps-dyn", type=int, default=5)
+    ap.add_argument("--shuffle-edges", type=int, default=-1, metavar="SEED",
+                    help="control: degree-preserving shuffle of the wiring with this seed (-1 = real wiring)")
+    ap.add_argument("--no-connectome", action="store_true", help="control: stem -> decoder, no neurons")
     ap.add_argument("--resume", type=Path, default=None)
     a = ap.parse_args()
 
@@ -142,7 +145,7 @@ def main():
     dev = torch.device(a.device)
     data = Rollouts(a.rollouts, max_frames_per_scenario=a.max_frames_per_scenario)
     conn = load_connectome(a.connectome)
-    cfg = FlyNetConfig(steps=a.steps_dyn)
+    cfg = FlyNetConfig(steps=a.steps_dyn, shuffle_seed=a.shuffle_edges, no_connectome=a.no_connectome)
     model = FlyNet(conn, cfg).to(dev)
     legal = legal_mask_table(dev)
     meta = {"args": {k: str(v) for k, v in vars(a).items()}, "model": model.meta(),
