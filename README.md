@@ -1,6 +1,7 @@
+# doomfly-rl
+
 <p align="center"><img src="docs/img/doomfly_icon.png" width="200" alt="doomfly-rl: a fruit fly in Doom marine armor"></p>
 
-# doomfly-rl
 
 A neural network wired like a fruit fly's brain, trained with gradient descent to play Doom.
 Built end to end by the [Strands harness](https://github.com/strands-agents/harness-sdk) in five
