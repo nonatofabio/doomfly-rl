@@ -13,6 +13,8 @@ datasets:
   - fernandofernandes/fly-connectome-49k
 ---
 
+<p align="center"><img src="doomfly_icon.png" width="160" alt="doomfly-rl icon"></p>
+
 # doomfly-rl: a network wired like a fruit fly's brain, playing Doom
 
 Three checkpoints from [nonatofabio/doomfly-rl](https://github.com/nonatofabio/doomfly-rl), all
@@ -25,7 +27,9 @@ connectome file they need. The project was built end to end by the
 parameters are an ordinary conv stem and MLP readout, and the controls below show the wiring
 adds nothing measurable on these scenarios.
 
-<p align="center"><img src="connectome_rotate.gif" width="360" alt="The MaleCNS-49k connectome, rotating"></p>
+<video src="doomfly_reel.mp4" controls autoplay muted loop playsinline width="100%"></video>
+
+*The `malecns49k_v2_final` checkpoint on the five ViZDoom scenarios, one clip each, median episode of ten.*
 
 ## Files
 
@@ -78,6 +82,8 @@ checkpoint runs on the five scenarios and in Freedoom II free play. On the five 
 output is bit-identical to the original head.
 
 ## Model
+
+<p align="center"><img src="connectome_rotate.gif" width="360" alt="The MaleCNS-49k connectome, 49,393 neurons, rotating"></p>
 
 `FlyNet` follows [mlabonne/chessfly](https://huggingface.co/mlabonne/chessfly). Input: a 4-frame
 stack of 72×96 grayscale Doom frames through a conv stem onto the visual sensory neurons. Core: the

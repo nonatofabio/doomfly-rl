@@ -26,3 +26,5 @@ assets/videos/
 tutorial/assets/videos/*.mp4
 # local run logs
 logs/
+# the one clip the HF model card embeds (5 MB web re-encode of the hero reel)
+!hf/doomfly_reel.mp4

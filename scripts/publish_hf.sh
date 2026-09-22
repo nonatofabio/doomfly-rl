@@ -23,6 +23,8 @@ hf repo create "$REPO" --type model 2>/dev/null || true   # exists -> fine
 
 hf upload "$REPO" hf/README.md README.md
 hf upload "$REPO" docs/img/connectome_rotate.gif connectome_rotate.gif
+hf upload "$REPO" docs/img/doomfly_icon.png doomfly_icon.png
+hf upload "$REPO" hf/doomfly_reel.mp4 doomfly_reel.mp4
 hf upload "$REPO" data/processed/connectome_malecns49k.npz connectome_malecns49k.npz
 hf upload "$REPO" data/processed/connectome_malecns49k.json connectome_malecns49k.json
 for c in $CKPTS; do
