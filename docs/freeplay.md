@@ -54,31 +54,42 @@ Per-episode (10 seeds, same order in every row):
 ## Backbone controls, same protocol
 
 Same 10 seeds, same conditions, on the step-60000 control checkpoints from `docs/controls.md`. Raw data:
-`docs/results/freeplay_zero_shot_malecns49k_noconn.json`, `…_shuffled_s0.json`. The `random` row is
-bit-identical across runs (same seeds, same legal set), which is the determinism check for the protocol.
+`docs/results/freeplay_zero_shot_malecns49k_noconn.json`, `…_shuffled_s0.json`. The `random` condition's
+per-episode records are identical in all three files (same seeds, same legal set; only `wall_s` differs),
+which is the determinism check for the protocol.
 
 | backbone, prior | kills | items | damage dealt | final health | died | decisions | displacement | path length |
 |---|---|---|---|---|---|---|---|---|
 | connectome, `deadly_corridor` | 0.8±0.4 | 2.6±1.8 | 16.8±12.4 | 24.8±37.7 | 0.8±0.4 | 658±260 | 590±218 | 4036±1328 |
 | no-connectome, `deadly_corridor` | 0.9±0.3 | 2.2±1.0 | 2.5±5.1 | 5.0±3.1 | 1.0±0.0 | 600±180 | 394±285 | 4560±910 |
-| shuffled s0, `deadly_corridor` | _running_ | | | | | | | |
+| shuffled s0, `deadly_corridor` | 1.2±0.6 | 3.0±1.3 | 14.0±16.7 | 32.0±35.4 | 0.6±0.5 | 699±302 | 450±317 | 3315±933 |
 | connectome, `health_gathering` | 0.2±0.4 | 1.1±1.3 | 0.0±0.0 | 73.2±41.6 | 0.3±0.5 | 901±189 | 602±148 | 13790±2934 |
 | no-connectome, `health_gathering` | 0.2±0.4 | 0.4±0.8 | 0.0±0.0 | 82.1±36.3 | 0.2±0.4 | 934±205 | 287±228 | 7056±1603 |
-| shuffled s0, `health_gathering` | _running_ | | | | | | | |
+| shuffled s0, `health_gathering` | 0.4±0.5 | 2.2±1.7 | 0.0±0.0 | 56.9±44.4 | 0.4±0.5 | 842±252 | 624±193 | 8729±3714 |
 
-Per-episode, no-connectome (same seed order as above):
+Per-episode (same seed order as above):
 
-| condition | kills | died | decisions |
+| backbone, prior | kills | died | decisions |
 |---|---|---|---|
-| as `deadly_corridor` | 1 1 1 0 1 1 1 1 1 1 | all | 739 436 473 262 822 853 510 508 711 681 |
-| as `health_gathering` | 1 0 0 0 1 0 0 0 0 0 | 1 0 0 0 1 0 0 0 0 0 | 354 1024 1024 1024 799 1024 1024 1024 1024 1024 |
+| no-connectome, `deadly_corridor` | 1 1 1 0 1 1 1 1 1 1 | all | 739 436 473 262 822 853 510 508 711 681 |
+| no-connectome, `health_gathering` | 1 0 0 0 1 0 0 0 0 0 | 1 0 0 0 1 0 0 0 0 0 | 354 1024 1024 1024 799 1024 1024 1024 1024 1024 |
+| shuffled s0, `deadly_corridor` | 1 2 1 0 2 1 1 1 1 2 | 1 0 1 0 0 1 1 1 1 0 | 374 1024 798 1024 1024 536 279 613 293 1024 |
+| shuffled s0, `health_gathering` | 0 1 1 0 0 0 0 0 1 1 | 0 1 0 1 0 0 0 0 1 1 | 1024 484 1024 363 1024 1024 1024 1024 565 864 |
 
-Reading: with n=10 and per-episode std this large, the two backbones are the same on kills, survival time
-and deaths. The one gap above noise is damage dealt with the `deadly_corridor` prior (16.8±12.4 vs 2.5±5.1):
-the connectome student fires at monsters more, the no-connectome student runs more (path 4560 vs 4036) and
-dies every time. Neither kills more than random. This is consistent with `docs/controls.md`: the backbones
-are interchangeable on the trained scenarios, and they start free play from the same place. Anything that
-separates them later has to come from the GRPO learning curves, not from the starting point.
+Reading: with n=10 and per-episode std this large, the three backbones are the same on kills, survival time
+and deaths (kills 0.8 / 0.9 / 1.2 with std 0.3–0.6; decisions 658 / 600 / 699 with std 180–300). Shuffled
+s0 has the best point estimates on kills (3 episodes with 2 kills, the only ones in any run) and survivals
+(4/10), but its 95 % interval on kills (~0.8–1.6) overlaps the other two. The one gap above noise is damage
+dealt with the `deadly_corridor` prior: 16.8±12.4 (connectome) and 14.0±16.7 (shuffled) vs 2.5±5.1
+(no-connectome). Both sparse backbones fire at monsters; the dense one runs more (path 4560 vs 4036/3315)
+and dies every time. Nobody kills more than random beyond noise. This is consistent with `docs/controls.md`:
+the backbones are interchangeable on the trained scenarios, and they start free play from the same place.
+Anything that separates them later has to come from the GRPO learning curves, not from the starting point.
+
+Cost (`wall_s` in the JSON, 20 policy episodes each, Apple silicon CPU): connectome 5,974 s, shuffled s0
+6,347 s, no-connectome 45 s. The dense backbone is ~130× cheaper per decision than the 49k-neuron sparse
+recurrent one on CPU (batch 1, 4 game tics included); on the L40S at training batch size the gap was 23×
+(646 vs 14,686 samples/s, `docs/controls.md`).
 
 ## Head surgery (plan step 2): done
 

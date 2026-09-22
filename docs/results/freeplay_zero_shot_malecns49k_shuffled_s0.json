@@ -1,0 +1,566 @@
+{
+ "ckpt": "checkpoints/malecns49k_shuffled_s0",
+ "step": 60000,
+ "map": "MAP01",
+ "skill": 3,
+ "max_steps": 1024,
+ "episodes": 10,
+ "seeds": [
+  1826701614,
+  1367864806,
+  1097657231,
+  579362555,
+  661058651,
+  87989972,
+  161576974,
+  35492826,
+  376383645,
+  1746484539
+ ],
+ "temperature": 1.0,
+ "conditions": {
+  "random_dc_legal": {
+   "episodes": [
+    {
+     "return": 0.0,
+     "exit": false,
+     "kills": 1.0,
+     "items": 0.0,
+     "secrets": 0.0,
+     "damage": 0.0,
+     "health": 10.0,
+     "dead": true,
+     "decisions": 227,
+     "displacement": 882.6277711399157,
+     "path": 1832.1276621295067
+    },
+    {
+     "return": 0.0,
+     "exit": false,
+     "kills": 1.0,
+     "items": 0.0,
+     "secrets": 0.0,
+     "damage": 0.0,
+     "health": 1.0,
+     "dead": true,
+     "decisions": 319,
+     "displacement": 869.3028762622608,
+     "path": 2477.5538996861583
+    },
+    {
+     "return": 0.0,
+     "exit": false,
+     "kills": 1.0,
+     "items": 0.0,
+     "secrets": 0.0,
+     "damage": 0.0,
+     "health": 7.0,
+     "dead": true,
+     "decisions": 399,
+     "displacement": 869.8269527076975,
+     "path": 3051.4602882498675
+    },
+    {
+     "return": 0.0,
+     "exit": false,
+     "kills": 1.0,
+     "items": 0.0,
+     "secrets": 0.0,
+     "damage": 0.0,
+     "health": 7.0,
+     "dead": true,
+     "decisions": 319,
+     "displacement": 877.2615785985183,
+     "path": 2683.05483983516
+    },
+    {
+     "return": 0.0,
+     "exit": false,
+     "kills": 1.0,
+     "items": 0.0,
+     "secrets": 0.0,
+     "damage": 0.0,
+     "health": 10.0,
+     "dead": true,
+     "decisions": 432,
+     "displacement": 80.33378679456744,
+     "path": 3819.9596019597093
+    },
+    {
+     "return": 0.0,
+     "exit": false,
+     "kills": 0.0,
+     "items": 0.0,
+     "secrets": 0.0,
+     "damage": 0.0,
+     "health": 1.0,
+     "dead": true,
+     "decisions": 214,
+     "displacement": 877.9687392906588,
+     "path": 1656.0009690038253
+    },
+    {
+     "return": 0.0,
+     "exit": false,
+     "kills": 1.0,
+     "items": 0.0,
+     "secrets": 0.0,
+     "damage": 0.0,
+     "health": 1.0,
+     "dead": true,
+     "decisions": 369,
+     "displacement": 575.985021348098,
+     "path": 2569.944210613232
+    },
+    {
+     "return": 0.0,
+     "exit": false,
+     "kills": 0.0,
+     "items": 2.0,
+     "secrets": 0.0,
+     "damage": 15.0,
+     "health": 3.0,
+     "dead": true,
+     "decisions": 151,
+     "displacement": 730.7975080286709,
+     "path": 1382.8986135598334
+    },
+    {
+     "return": 0.0,
+     "exit": false,
+     "kills": 0.0,
+     "items": 0.0,
+     "secrets": 0.0,
+     "damage": 0.0,
+     "health": 10.0,
+     "dead": true,
+     "decisions": 226,
+     "displacement": 851.5230077524136,
+     "path": 1836.0702942814446
+    },
+    {
+     "return": 0.0,
+     "exit": false,
+     "kills": 1.0,
+     "items": 0.0,
+     "secrets": 0.0,
+     "damage": 0.0,
+     "health": 4.0,
+     "dead": true,
+     "decisions": 316,
+     "displacement": 878.6084432844367,
+     "path": 2169.7422262687337
+    }
+   ],
+   "summary": {
+    "return": {
+     "mean": 0.0,
+     "std": 0.0
+    },
+    "exit": {
+     "mean": 0.0,
+     "std": 0.0
+    },
+    "kills": {
+     "mean": 0.7,
+     "std": 0.45825756949558394
+    },
+    "items": {
+     "mean": 0.2,
+     "std": 0.6000000000000001
+    },
+    "secrets": {
+     "mean": 0.0,
+     "std": 0.0
+    },
+    "damage": {
+     "mean": 1.5,
+     "std": 4.5
+    },
+    "health": {
+     "mean": 5.4,
+     "std": 3.6660605559646724
+    },
+    "dead": {
+     "mean": 1.0,
+     "std": 0.0
+    },
+    "decisions": {
+     "mean": 297.2,
+     "std": 85.60817717951949
+    },
+    "displacement": {
+     "mean": 749.4235685207237,
+     "std": 241.80567070209602
+    },
+    "path": {
+     "mean": 2347.8812605587473,
+     "std": 693.5475447784434
+    }
+   },
+   "wall_s": 4.4380271434783936
+  },
+  "pi_ref_as_deadly_corridor": {
+   "episodes": [
+    {
+     "return": 0.0,
+     "exit": false,
+     "kills": 1.0,
+     "items": 4.0,
+     "secrets": 0.0,
+     "damage": 0.0,
+     "health": 1.0,
+     "dead": true,
+     "decisions": 374,
+     "displacement": 81.4151948608835,
+     "path": 3249.6312531036565
+    },
+    {
+     "return": 0.0,
+     "exit": false,
+     "kills": 2.0,
+     "items": 4.0,
+     "secrets": 0.0,
+     "damage": 45.0,
+     "health": 53.0,
+     "dead": false,
+     "decisions": 1024,
+     "displacement": 640.407505947525,
+     "path": 4112.33777685381
+    },
+    {
+     "return": 0.0,
+     "exit": false,
+     "kills": 1.0,
+     "items": 2.0,
+     "secrets": 0.0,
+     "damage": 0.0,
+     "health": 9.0,
+     "dead": true,
+     "decisions": 798,
+     "displacement": 727.4761635273933,
+     "path": 4825.086369427097
+    },
+    {
+     "return": 0.0,
+     "exit": false,
+     "kills": 0.0,
+     "items": 0.0,
+     "secrets": 0.0,
+     "damage": 0.0,
+     "health": 100.0,
+     "dead": false,
+     "decisions": 1024,
+     "displacement": 81.39333531516804,
+     "path": 3266.74370009132
+    },
+    {
+     "return": 0.0,
+     "exit": false,
+     "kills": 2.0,
+     "items": 4.0,
+     "secrets": 0.0,
+     "damage": 40.0,
+     "health": 38.0,
+     "dead": false,
+     "decisions": 1024,
+     "displacement": 869.2813007865119,
+     "path": 2789.9868272871795
+    },
+    {
+     "return": 0.0,
+     "exit": false,
+     "kills": 1.0,
+     "items": 4.0,
+     "secrets": 0.0,
+     "damage": 0.0,
+     "health": 1.0,
+     "dead": true,
+     "decisions": 536,
+     "displacement": 35.73700574435037,
+     "path": 3347.6921946898924
+    },
+    {
+     "return": 0.0,
+     "exit": false,
+     "kills": 1.0,
+     "items": 4.0,
+     "secrets": 0.0,
+     "damage": 20.0,
+     "health": 2.0,
+     "dead": true,
+     "decisions": 279,
+     "displacement": 640.3820522995787,
+     "path": 2700.6354902866997
+    },
+    {
+     "return": 0.0,
+     "exit": false,
+     "kills": 1.0,
+     "items": 2.0,
+     "secrets": 0.0,
+     "damage": 0.0,
+     "health": 12.0,
+     "dead": true,
+     "decisions": 613,
+     "displacement": 81.56881668535486,
+     "path": 4716.0829184864615
+    },
+    {
+     "return": 0.0,
+     "exit": false,
+     "kills": 1.0,
+     "items": 4.0,
+     "secrets": 0.0,
+     "damage": 25.0,
+     "health": 14.0,
+     "dead": true,
+     "decisions": 293,
+     "displacement": 671.5771864971961,
+     "path": 1878.3356468696659
+    },
+    {
+     "return": 0.0,
+     "exit": false,
+     "kills": 2.0,
+     "items": 2.0,
+     "secrets": 0.0,
+     "damage": 10.0,
+     "health": 90.0,
+     "dead": false,
+     "decisions": 1024,
+     "displacement": 671.5360515439768,
+     "path": 2263.1309367811336
+    }
+   ],
+   "summary": {
+    "return": {
+     "mean": 0.0,
+     "std": 0.0
+    },
+    "exit": {
+     "mean": 0.0,
+     "std": 0.0
+    },
+    "kills": {
+     "mean": 1.2,
+     "std": 0.6000000000000001
+    },
+    "items": {
+     "mean": 3.0,
+     "std": 1.3416407864998738
+    },
+    "secrets": {
+     "mean": 0.0,
+     "std": 0.0
+    },
+    "damage": {
+     "mean": 14.0,
+     "std": 16.703293088490067
+    },
+    "health": {
+     "mean": 32.0,
+     "std": 35.41186241925155
+    },
+    "dead": {
+     "mean": 0.6,
+     "std": 0.4898979485566356
+    },
+    "decisions": {
+     "mean": 698.9,
+     "std": 302.17989675026365
+    },
+    "displacement": {
+     "mean": 450.0774613207938,
+     "std": 316.63003386586934
+    },
+    "path": {
+     "mean": 3314.9663113876913,
+     "std": 933.2913693926406
+    }
+   },
+   "wall_s": 2868.042037010193
+  },
+  "pi_ref_as_health_gathering": {
+   "episodes": [
+    {
+     "return": 0.0,
+     "exit": false,
+     "kills": 0.0,
+     "items": 2.0,
+     "secrets": 0.0,
+     "damage": 0.0,
+     "health": 102.0,
+     "dead": false,
+     "decisions": 1024,
+     "displacement": 640.4104120039744,
+     "path": 12713.969851772179
+    },
+    {
+     "return": 0.0,
+     "exit": false,
+     "kills": 1.0,
+     "items": 4.0,
+     "secrets": 0.0,
+     "damage": 0.0,
+     "health": 11.0,
+     "dead": true,
+     "decisions": 484,
+     "displacement": 732.8316018003384,
+     "path": 6922.570388696603
+    },
+    {
+     "return": 0.0,
+     "exit": false,
+     "kills": 1.0,
+     "items": 4.0,
+     "secrets": 0.0,
+     "damage": 0.0,
+     "health": 35.0,
+     "dead": false,
+     "decisions": 1024,
+     "displacement": 632.6521128011567,
+     "path": 10674.954020442776
+    },
+    {
+     "return": 0.0,
+     "exit": false,
+     "kills": 0.0,
+     "items": 3.0,
+     "secrets": 0.0,
+     "damage": 0.0,
+     "health": 7.0,
+     "dead": true,
+     "decisions": 363,
+     "displacement": 756.8815373234986,
+     "path": 3621.8631344962223
+    },
+    {
+     "return": 0.0,
+     "exit": false,
+     "kills": 0.0,
+     "items": 0.0,
+     "secrets": 0.0,
+     "damage": 0.0,
+     "health": 100.0,
+     "dead": false,
+     "decisions": 1024,
+     "displacement": 780.4587206283254,
+     "path": 11103.607657937393
+    },
+    {
+     "return": 0.0,
+     "exit": false,
+     "kills": 0.0,
+     "items": 0.0,
+     "secrets": 0.0,
+     "damage": 0.0,
+     "health": 100.0,
+     "dead": false,
+     "decisions": 1024,
+     "displacement": 65.9691539160217,
+     "path": 15573.215616903472
+    },
+    {
+     "return": 0.0,
+     "exit": false,
+     "kills": 0.0,
+     "items": 0.0,
+     "secrets": 0.0,
+     "damage": 0.0,
+     "health": 100.0,
+     "dead": false,
+     "decisions": 1024,
+     "displacement": 640.4001484603674,
+     "path": 4831.978797805009
+    },
+    {
+     "return": 0.0,
+     "exit": false,
+     "kills": 0.0,
+     "items": 1.0,
+     "secrets": 0.0,
+     "damage": 0.0,
+     "health": 101.0,
+     "dead": false,
+     "decisions": 1024,
+     "displacement": 640.4138807775452,
+     "path": 5852.459396228418
+    },
+    {
+     "return": 0.0,
+     "exit": false,
+     "kills": 1.0,
+     "items": 4.0,
+     "secrets": 0.0,
+     "damage": 0.0,
+     "health": 2.0,
+     "dead": true,
+     "decisions": 565,
+     "displacement": 709.6448137690953,
+     "path": 5555.33259889127
+    },
+    {
+     "return": 0.0,
+     "exit": false,
+     "kills": 1.0,
+     "items": 4.0,
+     "secrets": 0.0,
+     "damage": 0.0,
+     "health": 11.0,
+     "dead": true,
+     "decisions": 864,
+     "displacement": 640.4231745771272,
+     "path": 10444.381208930155
+    }
+   ],
+   "summary": {
+    "return": {
+     "mean": 0.0,
+     "std": 0.0
+    },
+    "exit": {
+     "mean": 0.0,
+     "std": 0.0
+    },
+    "kills": {
+     "mean": 0.4,
+     "std": 0.4898979485566356
+    },
+    "items": {
+     "mean": 2.2,
+     "std": 1.7204650534085253
+    },
+    "secrets": {
+     "mean": 0.0,
+     "std": 0.0
+    },
+    "damage": {
+     "mean": 0.0,
+     "std": 0.0
+    },
+    "health": {
+     "mean": 56.9,
+     "std": 44.43973447265409
+    },
+    "dead": {
+     "mean": 0.4,
+     "std": 0.4898979485566356
+    },
+    "decisions": {
+     "mean": 842.0,
+     "std": 251.70657520215875
+    },
+    "displacement": {
+     "mean": 624.008555605745,
+     "std": 193.35637358004323
+    },
+    "path": {
+     "mean": 8729.433267210348,
+     "std": 3714.441563623022
+    }
+   },
+   "wall_s": 3478.5016288757324
+  }
+ }
+}
