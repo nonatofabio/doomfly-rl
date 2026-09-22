@@ -27,7 +27,7 @@ connectome file they need. The project was built end to end by the
 parameters are an ordinary conv stem and MLP readout, and the controls below show the wiring
 adds nothing measurable on these scenarios.
 
-<video src="doomfly_reel.mp4" controls autoplay muted loop playsinline width="100%"></video>
+<video src="https://huggingface.co/fabiononato/doomfly-rl/resolve/main/doomfly_reel.mp4" controls autoplay muted loop playsinline width="100%"></video>
 
 *The `malecns49k_v2_final` checkpoint on the five ViZDoom scenarios, one clip each, median episode of ten.*
 
