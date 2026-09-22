@@ -61,6 +61,8 @@ the footage above), `malecns49k_shuffled_s0` (degree-preserving shuffle), `malec
 
 ## What the model is
 
+<p align="center"><img src="docs/img/connectome_rotate.gif" width="360" alt="The MaleCNS-49k connectome, 49,393 neurons, rotating"></p>
+
 `FlyNet` reuses the recipe of [mlabonne/chessfly](https://huggingface.co/mlabonne/chessfly): the
 recurrent core is a real connectome, the wiring and the sign of every synapse are frozen, and
 training learns one gain per synapse. Around it sit ordinary learned modules: a conv stem turns a

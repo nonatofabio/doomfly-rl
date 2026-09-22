@@ -25,6 +25,8 @@ connectome file they need. The project was built end to end by the
 parameters are an ordinary conv stem and MLP readout, and the controls below show the wiring
 adds nothing measurable on these scenarios.
 
+<p align="center"><img src="connectome_rotate.gif" width="360" alt="The MaleCNS-49k connectome, rotating"></p>
+
 ## Files
 
 | Path | What it is |
