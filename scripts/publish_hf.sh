@@ -2,7 +2,7 @@
 # Publish the trained checkpoints and the connectome they need to Hugging Face.
 #
 #   hf auth login                 # once
-#   scripts/publish_hf.sh         # -> https://huggingface.co/nonatofabio/doomfly-rl
+#   scripts/publish_hf.sh         # -> https://huggingface.co/fabiononato/doomfly-rl
 #
 # Uploads checkpoints/<name>/{model.safetensors,config.json} for the three step-60k
 # MaleCNS-49k students, data/processed/connectome_malecns49k.{npz,json}, and hf/README.md
@@ -10,7 +10,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-REPO=${HF_REPO:-nonatofabio/doomfly-rl}
+REPO=${HF_REPO:-fabiononato/doomfly-rl}
 CKPTS="malecns49k_v2_final malecns49k_shuffled_s0 malecns49k_noconn"
 
 for c in $CKPTS; do

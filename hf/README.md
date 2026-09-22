@@ -53,7 +53,7 @@ Every gap is inside one eval standard deviation. Full protocol and training curv
 ```bash
 git clone https://github.com/nonatofabio/doomfly-rl && cd doomfly-rl
 uv venv && uv pip install -e . huggingface_hub
-hf download nonatofabio/doomfly-rl --local-dir hf
+hf download fabiononato/doomfly-rl --local-dir hf
 
 # play 10 episodes of every scenario and write the median one per scenario as MP4
 python -m doomfly.evaluate --ckpt hf/malecns49k_v2_final --connectome hf/connectome_malecns49k.npz \

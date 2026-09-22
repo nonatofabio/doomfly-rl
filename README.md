@@ -1,3 +1,5 @@
+<img src="docs/img/doomfly_icon_512.png" width="80" align="right" alt="doomfly-rl icon">
+
 # doomfly-rl
 
 A neural network wired like a fruit fly's brain, trained with gradient descent to play Doom.
@@ -42,11 +44,11 @@ Read a `doomfly-rl` score as "connectome-constrained RL agent", never as "a fly"
 ## Try the trained models
 
 Checkpoints and the connectome file they need are on Hugging Face:
-[nonatofabio/doomfly-rl](https://huggingface.co/nonatofabio/doomfly-rl).
+[fabiononato/doomfly-rl](https://huggingface.co/fabiononato/doomfly-rl).
 
 ```bash
 uv venv && uv pip install -e . huggingface_hub
-hf download nonatofabio/doomfly-rl --local-dir hf
+hf download fabiononato/doomfly-rl --local-dir hf
 python -m doomfly.evaluate --ckpt hf/malecns49k_v2_final --connectome hf/connectome_malecns49k.npz \
     --episodes 10 --gif-dir /tmp/clips --tics --pick median --fmt mp4 --device cpu
 ```
