@@ -25,7 +25,7 @@ hf upload "$REPO" hf/README.md README.md
 hf upload "$REPO" data/processed/connectome_malecns49k.npz connectome_malecns49k.npz
 hf upload "$REPO" data/processed/connectome_malecns49k.json connectome_malecns49k.json
 for c in $CKPTS; do
-  hf upload "$REPO" "checkpoints/$c" "$c" --include 'model.safetensors' 'config.json'
+  hf upload "$REPO" "checkpoints/$c" "$c"
 done
 
 echo "✓ https://huggingface.co/$REPO"
