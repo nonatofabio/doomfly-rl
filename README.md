@@ -1,4 +1,4 @@
-<img src="docs/img/doomfly_icon_512.png" width="80" align="right" alt="doomfly-rl icon">
+<p align="center"><img src="docs/img/doomfly_icon.png" width="200" alt="doomfly-rl: a fruit fly in Doom marine armor"></p>
 
 # doomfly-rl
 
