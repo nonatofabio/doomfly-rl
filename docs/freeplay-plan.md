@@ -1,6 +1,10 @@
 # Free play on Freedoom II: plan
 
-Status: zero-shot baselines running (`doomfly/freeplay_zero_shot.py`); nothing trained yet.
+Status: steps 1 and 2 done (`docs/freeplay.md`). Step 3 implemented as
+`doomfly/grpo_freeplay.py` and launched on all three backbones. Budget: 500 iterations,
+not ~1000. At the sweep's measured L40S cost (update ≈4.4 ms/sample, sampling ≈75 ms per
+32-env step), one 32 × 512 iteration takes ≈110 s, so 500 iterations ≈15 h already fills
+the 10–15 h budget.
 
 ## Why
 

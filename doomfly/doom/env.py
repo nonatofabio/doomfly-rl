@@ -92,7 +92,12 @@ class DoomEnv(gym.Env):
         f = _resize_gray(st.screen_buffer)
         for _ in range(FRAME_STACK):
             self.frames.append(f)
-        return np.stack(self.frames), {}
+        info = {}
+        if self.sc.doom_map is not None:  # spawn-time vars, so reward shapers see the starting health/position
+            self.last_vars = st.game_variables
+            info["vars"] = dict(zip(GAME_VARS, map(float, self.last_vars)))
+            info["dead"] = False
+        return np.stack(self.frames), info
 
     def step(self, local_action: int):
         gidx = self.local_actions[int(local_action)]

@@ -13,7 +13,11 @@
 #   STUDENT_NAME     backbone name used in run names (default malecns49k)
 #   CONNECTOME       npz under data/processed (default connectome_malecns49k.npz)
 #   GRPO_COMMON      args shared by every run (default: --iters 300 --eval-every 25 --eval-episodes 10)
-#   GRPO_RUNS        ';'-separated "what|extra args". Run i goes to GPU i % NGPU. Run name = ${STUDENT_NAME}_grpo_<what>.
+#   GRPO_MODULE      python module to run (default doomfly.grpo; doomfly.grpo_freeplay for MAP01)
+#   GRPO_RUNS        ';'-separated "what|extra args[|backbone|student]". Run i goes to GPU i % NGPU.
+#                    Run name = <backbone>_grpo_<what>; backbone defaults to $STUDENT_NAME, student (S3 dir, absolute
+#                    or relative to the bucket) defaults to $STUDENT. A per-run student is pulled to data/student_<backbone>
+#                    and becomes that run's pi_ref, so one box can run the same recipe on several backbones.
 #                    Commas in the args become spaces (launch_region.sh EXTRA_ENV cannot carry spaces), so
 #                    "beta0.2|--beta,0.2" == "beta0.2|--beta 0.2". Default = 4-run grid, one knob per run (see below).
 #   STOP_WHEN_DONE   1/0 (default 1)
@@ -28,6 +32,8 @@ STUDENT_NAME=${STUDENT_NAME:-malecns49k}
 CONNECTOME=${CONNECTOME:-connectome_malecns49k.npz}
 GRPO_COMMON=${GRPO_COMMON:-"--iters 300 --eval-every 25 --eval-episodes 10"}
 # default grid: base (grpo.py defaults: beta 0.05, groups 4 x G 8, T 1.0, lr 3e-5) + one knob each
+GRPO_COMMON=${GRPO_COMMON//,/ }  # commas -> spaces, as for GRPO_RUNS (EXTRA_ENV cannot carry spaces)
+GRPO_MODULE=${GRPO_MODULE:-doomfly.grpo}
 GRPO_RUNS=${GRPO_RUNS:-"base|;beta0.01|--beta 0.01;beta0.2|--beta 0.2;g16|--group-size 16"}
 STOP_WHEN_DONE=${STOP_WHEN_DONE:-1}
 mkdir -p $LOGS $DATA/student $RUNS $TB $ROOT/markers
@@ -40,7 +46,7 @@ SHIPPER=$!
 trap 'kill $SHIPPER 2>/dev/null || true; aws s3 sync $LOGS $OUT/logs --only-show-errors || true' EXIT
 
 # ---------------------------------------------------------------- 1: bootstrap (reuse run_all stage 0)
-log "grpo pipeline: prefix $DOOMFLY_PREFIX, student $STUDENT, runs: $GRPO_RUNS"
+log "grpo pipeline: prefix $DOOMFLY_PREFIX, module $GRPO_MODULE, student $STUDENT, runs: $GRPO_RUNS"
 if [[ ! -f $ROOT/markers/stage0.done ]]; then
   aws s3 cp $S3/code/run_all.sh $ROOT/run_all.sh --only-show-errors && chmod +x $ROOT/run_all.sh
   STAGES="0" STOP_WHEN_DONE=0 $ROOT/run_all.sh
@@ -53,32 +59,41 @@ if ! pgrep -f "tensorboard --logdir" >/dev/null; then
 fi
 
 # ---------------------------------------------------------------- 2: student (pi_ref)
-if [[ ! -f $ROOT/markers/student.done ]]; then
-  aws s3 cp $STUDENT/config.json $DATA/student/config.json --only-show-errors
-  aws s3 cp $STUDENT/model.safetensors $DATA/student/model.safetensors --only-show-errors
-  [[ -s $DATA/student/model.safetensors ]] || { log "student pull FAILED from $STUDENT"; exit 1; }
-  cp $DATA/student/config.json $LOGS/student_config.json
-  echo "$STUDENT" > $LOGS/student_source.txt
-  touch $ROOT/markers/student.done; log "student ready: $(du -h $DATA/student/model.safetensors | cut -f1)"
-fi
+pull_student() {  # $1 = S3 dir, $2 = local dir, $3 = log tag
+  local src=$1 dst=$2 tag=$3
+  [[ -f $dst/.done ]] && return 0
+  mkdir -p $dst
+  aws s3 cp $src/config.json $dst/config.json --only-show-errors
+  aws s3 cp $src/model.safetensors $dst/model.safetensors --only-show-errors
+  [[ -s $dst/model.safetensors ]] || { log "student pull FAILED from $src"; exit 1; }
+  cp $dst/config.json $LOGS/${tag}_config.json
+  echo "$src" > $LOGS/${tag}_source.txt
+  touch $dst/.done; log "$tag ready from $src: $(du -h $dst/model.safetensors | cut -f1)"
+}
+pull_student $STUDENT $DATA/student student
 
 # ---------------------------------------------------------------- 3: grpo
 NGPU=$(nvidia-smi -L 2>/dev/null | wc -l); [[ $NGPU -ge 1 ]] || NGPU=1
 log "grpo on $NGPU GPU(s): $(nvidia-smi --query-gpu=name --format=csv,noheader | head -1)"
-grpo_one() {  # $1 = run name, $2 = gpu index, $3... = extra args
-  local name=$1 gpu=$2; shift 2
+grpo_one() {  # $1 = run name, $2 = gpu index, $3 = student dir, $4... = extra args
+  local name=$1 gpu=$2 ckpt=$3; shift 3
   [[ -f $RUNS/$name/final/model.safetensors ]] && { log "$name already final"; return 0; }
   log "start $name on gpu $gpu: $GRPO_COMMON $*"
   # shellcheck disable=SC2086
-  CUDA_VISIBLE_DEVICES=$gpu python -u -m doomfly.grpo --ckpt $DATA/student --connectome $DATA/processed/$CONNECTOME \
+  CUDA_VISIBLE_DEVICES=$gpu python -u -m $GRPO_MODULE --ckpt $ckpt --connectome $DATA/processed/$CONNECTOME \
     --out $RUNS/$name --tb $TB/grpo_$name --s3 $OUT/runs/$name $GRPO_COMMON "$@" > $LOGS/grpo_$name.log 2>&1
 }
 pids=(); fail=0; i=0
 IFS=';' read -ra SPECS <<< "$GRPO_RUNS"
 for spec in "${SPECS[@]}"; do
-  what=${spec%%|*}; extra=${spec#*|}; [[ "$spec" == *"|"* ]] || extra=""; extra=${extra//,/ }
+  IFS='|' read -r what extra backbone student <<< "$spec"
+  extra=${extra//,/ }; backbone=${backbone:-$STUDENT_NAME}; ckpt=$DATA/student
+  if [[ -n $student ]]; then
+    [[ $student == s3://* ]] || student=$S3/${student#/}
+    ckpt=$DATA/student_$backbone; pull_student $student $ckpt student_$backbone
+  fi
   # shellcheck disable=SC2086
-  grpo_one ${STUDENT_NAME}_grpo_$what $((i % NGPU)) $extra & pids+=($!)
+  grpo_one ${backbone}_grpo_$what $((i % NGPU)) $ckpt $extra & pids+=($!)
   i=$((i + 1))
 done
 for p in "${pids[@]}"; do wait $p || fail=1; done

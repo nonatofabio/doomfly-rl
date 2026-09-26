@@ -47,7 +47,7 @@ Mean return, 10 episodes unless stated. `±` is `std_return` across episodes.
 |---|---|---|---|---|
 | basic | 80.9 / 84.5 (t = 1.0 M) | −279.4 ± 117.0 | 78.2 ± 7.5 | 78.2 ± 7.5 (unchanged, all runs) |
 | defend_the_center | — | 8.3 ± 1.5 | 18.6 ± 1.8 | 21.4 ± 1.9 (`lrconn1e-4`) |
-| health_gathering | — | 1403.0 ± 719.3 | 1728.0 ± 615.5 | 2100.0 ± 0.0 (`temp1.2`; 2100 = timeout ceiling) |
+| health_gathering | — | 1403.0 ± 719.3 | 1728.0 ± 615.5 | 2100.0 ± 0.0 (`temp1.2`; 2100 = timeout ceiling; confounded run, see the note after §4's tables) |
 | deadly_corridor | 2262.1 / 2281.1 (t = 8.0 M) | 155.8 ± 152.2 | 2280.5 ± 2.4 | 2281.8 ± 1.8 (`baselinemean`) |
 | defend_the_line | — | 19.95 ± 5.01 | 21.0 ± 5.9 | 24.3 ± 3.7 (`base`) |
 
@@ -83,7 +83,7 @@ basic 7.5, dtc 1.8, hg 615.5, dc 2.4, dtl 5.9.
 | `beta0.01` | `grpo-use2` | `--beta 0.01` | 78.2 (+0.0) | 7.5 ± 1.5 (**−11.1**) | 968 ± 532 (**−760**) | 1698 ± 929 (**−583**) | 21.1 ± 4.9 (+0.1) |
 | `beta0.2` | `grpo-use2` | `--beta 0.2` | 74.8 ± 13.5 (−3.4) | 17.5 ± 1.9 (−1.1) | 1697 ± 591 (−31) | 2281.2 ± 2.5 (+0.7) | 21.8 ± 3.9 (+0.8) |
 | `g16` | `grpo-use2` | `--group-size 16` | 78.2 (+0.0) | 13.8 ± 1.5 (**−4.8**) | 1914 ± 302 (+186) | 2280.2 ± 3.4 (−0.3) | 23.8 ± 4.7 (+2.8) |
-| `temp1.2` | `grpo-use1-1gpu` | `--temperature 1.2` | 78.2 (+0.0) | 14.4 ± 1.9 (**−4.2**) | 2100 ± 0 (+372) | 1167 ± 747 (**−1114**) | 18.9 ± 6.1 (−2.1) |
+| `temp1.2`† | `grpo-use1-1gpu` | `--temperature 1.2` | 78.2 (+0.0) | 14.4 ± 1.9 (**−4.2**) | 2100 ± 0 (+372) | 1167 ± 747 (**−1114**) | 18.9 ± 6.1 (−2.1) |
 | `lrconn1e-4` | `grpo-use1-1gpu` | `--lr-conn 1e-4` | 78.2 (+0.0) | 21.4 ± 1.9 (+2.8) | 1802 ± 465 (+74) | 2281.5 ± 1.9 (+1.0) | 22.9 ± 4.4 (+1.9) |
 | `lr1e-4` | `grpo-use1-1gpu` | `--lr 1e-4` | 78.2 (+0.0) | 12.8 ± 1.0 (**−5.8**) | 1674 ± 687 (−54) | 2129 ± 450 (−151) | 20.9 ± 6.3 (−0.1) |
 | `ent0.01` | `grpo-use1-1gpu` | `--ent-coef 0.01` | 78.2 (+0.0) | 14.8 ± 0.9 (**−3.8**) | 1986 ± 343 (+258) | 2279.7 ± 2.4 (−0.8) | 22.5 ± 5.1 (+1.5) |
@@ -92,7 +92,8 @@ basic 7.5, dtc 1.8, hg 615.5, dc 2.4, dtl 5.9.
 | `groups8` | `grpo-usw2-1gpu` | `--groups 8` | 78.2 (+0.0) | 17.5 ± 3.0 (−1.1) | 2072 ± 84 (+344) | 2281.4 ± 2.7 (+1.0) | 20.4 ± 4.7 (−0.6) |
 | `baselinemean` | `grpo-usw2-1gpu` | `--baseline mean` | 78.2 (+0.0) | 18.3 ± 2.9 (−0.3) | 1967 ± 309 (+239) | 2281.8 ± 1.8 (+1.3) | 23.3 ± 5.0 (+2.3) |
 
-Bold = |Δ| larger than 2 × the student std for that scenario. Mean of the last four evals
+Bold = |Δ| larger than 2 × the student std for that scenario. † = confounded by a
+sampling/update temperature mismatch; see the note below. Mean of the last four evals
 (iters 225–300), which smooths the 10-episode noise:
 
 | Run | dtc | hg | dc | dtl |
@@ -102,7 +103,7 @@ Bold = |Δ| larger than 2 × the student std for that scenario. Mean of the last
 | `beta0.01` | 10.8 | 1033 | 2134.8 | 23.7 |
 | `beta0.2` | 15.5 | 1874 | 2280.0 | 22.2 |
 | `g16` | 16.3 | 2019 | 2281.2 | 21.8 |
-| `temp1.2` | 12.3 | 1997 | 856.2 | 19.5 |
+| `temp1.2`† | 12.3 | 1997 | 856.2 | 19.5 |
 | `lrconn1e-4` | 21.0 | 1859 | 2280.4 | 22.4 |
 | `lr1e-4` | 12.7 | 1655 | 2210.1 | 20.6 |
 | `ent0.01` | 15.3 | 1923 | 2280.5 | 23.0 |
@@ -110,6 +111,27 @@ Bold = |Δ| larger than 2 × the student std for that scenario. Mean of the last
 | `clip0.1` | 15.2 | 1770 | 2134.8 | 23.0 |
 | `groups8` | 15.8 | 1970 | 2281.1 | 21.9 |
 | `baselinemean` | 19.8 | 1616 | 2281.0 | 22.8 |
+
+**`temp1.2` is confounded; do not read it as a temperature result.** At the time of this
+sweep `grpo_step` computed the PPO ratio from `log_softmax(logits)`, while `logp_old` was
+sampled from `logits / T`. With T ≠ 1 the ratio is not 1 even on the first minibatch, so the
+update was biased toward the untempered policy from step 0. Other T = 1 runs were not
+affected. Evidence from the run's own `metrics.jsonl` (mean clipfrac over all iterations,
+same box `grpo-use1-1gpu`):
+
+| Run | basic | dtc | hg | dc | dtl |
+|---|---|---|---|---|---|
+| `temp1.2` | 0.036 | 0.172 | 0.054 | **0.184** | 0.111 |
+| `ent0.01` | 0.001 | 0.057 | 0.040 | 0.028 | 0.057 |
+| `lrconn1e-4` | 0.002 | 0.060 | 0.046 | 0.021 | 0.051 |
+| `lr1e-4` | 0.007 | 0.119 | 0.100 | 0.069 | 0.161 |
+
+dc, the scenario that collapsed (−1114), clips 2.7–8.8× more than the other runs on the box.
+A CPU check on MAP01 frames (FREEPLAY, 2 groups × 2) gives ratio 1.003, clipfrac 0.14 on
+the first minibatch when sampled at T = 1.2 and updated at T = 1.0, and ratio 1.000000,
+clipfrac 0 when both use the same T. The fix (the ratio uses the sampling temperature;
+KL and entropy stay on the untempered policy) is in `doomfly/grpo.py`. The run was not
+repeated.
 
 ## 5. What the training curves say
 

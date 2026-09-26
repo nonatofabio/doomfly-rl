@@ -44,11 +44,20 @@ from .train import legal_mask_table, s3_sync
 
 # ----------------------------------------------------------------------------- sampling
 @torch.no_grad()
-def sample_groups(model, envs, seeds, sid, legal_row, device, max_steps, temperature=1.0):
+def sample_groups(model, envs, seeds, sid, legal_row, device, max_steps, temperature=1.0, shapers=None):
     """Roll one episode in every env (env k of group g gets seeds[g]). Returns a
-    flat list of trajectories: dict(obs uint8 [T,4,H,W], act int64 [T], logp f32 [T], R, T, group)."""
+    flat list of trajectories: dict(obs uint8 [T,4,H,W], act int64 [T], logp f32 [T], R, T, group).
+
+    shapers: optional list, one per env, of callables with reset(info) and
+    __call__(r, info) -> shaped r (see doomfly.grpo_freeplay.ShapedReward). With
+    shapers, R is the shaped return and each trajectory also carries the
+    per-component totals (comps) and whether the player died (dead)."""
     G = len(envs) // len(seeds)
-    obs = np.stack([e.reset(seed=int(seeds[k // G]))[0] for k, e in enumerate(envs)])
+    resets = [e.reset(seed=int(seeds[k // G])) for k, e in enumerate(envs)]
+    obs = np.stack([o for o, _ in resets])
+    if shapers is not None:
+        for sh, (_, info) in zip(shapers, resets):
+            sh.reset(info)
     n = len(envs)
     local = np.asarray(envs[0].sc.actions)
     g2l = {int(g): i for i, g in enumerate(local)}
@@ -68,7 +77,9 @@ def sample_groups(model, envs, seeds, sid, legal_row, device, max_steps, tempera
         logp = dist.log_prob(act).cpu().numpy()
         act_np = act.cpu().numpy()
         for j, k in enumerate(idx):
-            o, r, done, _, _ = envs[k].step(g2l[int(act_np[j])])
+            o, r, done, _, info = envs[k].step(g2l[int(act_np[j])])
+            if shapers is not None:
+                r = shapers[k](r, info)
             tr = traj[k]
             tr["obs"].append(obs[k].copy()); tr["act"].append(int(act_np[j])); tr["logp"].append(float(logp[j])); tr["rew"].append(r)
             obs[k] = o
@@ -79,6 +90,8 @@ def sample_groups(model, envs, seeds, sid, legal_row, device, max_steps, tempera
         out.append({"obs": np.stack(tr["obs"]), "act": np.asarray(tr["act"], np.int64),
                     "logp": np.asarray(tr["logp"], np.float32), "R": float(np.sum(tr["rew"])),
                     "T": len(tr["act"]), "group": k // G})
+        if shapers is not None:
+            out[-1].update(comps=dict(shapers[k].totals), dead=shapers[k].dead)
     return out
 
 
@@ -112,7 +125,10 @@ def flat_batch(trajs, adv):
 
 
 def grpo_step(model, ref, opt, batch, sid, legal_row, device, clip=0.2, beta=0.05, ent_coef=0.0,
-              epochs=2, minibatch=256, max_grad_norm=1.0, use_bf16=True):
+              epochs=2, minibatch=256, max_grad_norm=1.0, use_bf16=True, temperature=1.0):
+    """PPO-clip update. The ratio uses the same temperature the samples were drawn at (logp_old
+    came from logits/T), so it is exactly 1 on the first minibatch. KL(pi||pi_ref) and entropy are
+    of the untempered policy. beta == 0 skips the reference forward pass."""
     obs, act, logp_old, A = batch
     N = len(act)
     stats = {"loss": 0.0, "pg": 0.0, "kl": 0.0, "ent": 0.0, "clipfrac": 0.0, "ratio": 0.0}
@@ -129,15 +145,19 @@ def grpo_step(model, ref, opt, batch, sid, legal_row, device, clip=0.2, beta=0.0
             mask = legal_row[None].expand(len(mb), -1)
             with torch.autocast(device_type="cuda", dtype=torch.bfloat16, enabled=use_bf16 and device.type == "cuda"):
                 logits = model(fr, sc, legal_mask=mask)["policy"].float()
-                with torch.no_grad():
-                    ref_logits = ref(fr, sc, legal_mask=mask)["policy"].float()
-            logp = F.log_softmax(logits, -1)
-            lp = logp.gather(1, a[:, None])[:, 0]
+                if beta:
+                    with torch.no_grad():
+                        ref_logits = ref(fr, sc, legal_mask=mask)["policy"].float()
+            lp = F.log_softmax(logits / temperature, -1).gather(1, a[:, None])[:, 0]
             ratio = torch.exp(lp - lp_old)
             pg = -torch.min(ratio * adv, ratio.clamp(1 - clip, 1 + clip) * adv).mean()
-            ref_logp = F.log_softmax(ref_logits, -1)
+            logp = F.log_softmax(logits, -1)
             p = logp.exp()
-            kl = (p * (logp - ref_logp)).masked_fill(~mask, 0.0).sum(-1).mean()   # KL(pi || pi_ref), full-distribution
+            if beta:
+                ref_logp = F.log_softmax(ref_logits, -1)
+                kl = (p * (logp - ref_logp)).masked_fill(~mask, 0.0).sum(-1).mean()   # KL(pi || pi_ref), full-distribution
+            else:
+                kl = torch.zeros((), device=device)
             ent = -(p * logp).masked_fill(~mask, 0.0).sum(-1).mean()
             loss = pg + beta * kl - ent_coef * ent
             opt.zero_grad(set_to_none=True)
@@ -233,7 +253,8 @@ def main():
         # every sample clipped) and the running stats would drift. Gradients flow fine in eval mode.
         model.eval()
         ts = time.time()
-        st = grpo_step(model, ref, opt, batch, sc.id, legal[sc.id], dev, a.clip, a.beta, a.ent_coef, a.epochs, a.minibatch)
+        st = grpo_step(model, ref, opt, batch, sc.id, legal[sc.id], dev, a.clip, a.beta, a.ent_coef, a.epochs, a.minibatch,
+                          temperature=a.temperature)
         t_update = time.time() - ts
         R = np.array([t["R"] for t in trajs])
         rec = {"iter": it, "scenario": nm, "return_mean": float(R.mean()), "return_std": float(R.std()),
