@@ -1,10 +1,21 @@
 # Free play on Freedoom II: plan
 
 Status: steps 1 and 2 done (`docs/freeplay.md`). Step 3 implemented as
-`doomfly/grpo_freeplay.py` and launched on all three backbones. Budget: 500 iterations,
-not ~1000. At the sweep's measured L40S cost (update ≈4.4 ms/sample, sampling ≈75 ms per
-32-env step), one 32 × 512 iteration takes ≈110 s, so 500 iterations ≈15 h already fills
-the 10–15 h budget.
+`doomfly/grpo_freeplay.py` and launched on all three backbones (2026-09-26, one g6e.4xlarge
+each in us-east-2c, prefixes `freeplay-grpo-{conn,shuffled-s0,noconn}`). Budget: 500
+iterations, not ~1000. That cap came from a pre-launch estimate: ≈110 s per 32 × 512
+iteration, taken from the sweep's per-sample cost. The estimate was too high. Iterations
+1–12 in each run's `logs/grpo_*_freeplay.log` give:
+
+| backbone | t_sample | t_update | ep_len |
+|---|---|---|---|
+| connectome | 18–25 s | 12–17 s | 300–436 |
+| shuffled s0 | 22–28 s | 15–19 s | 371–475 |
+| no-connectome | 22–25 s | ≈1 s | 408–477 |
+
+At that rate 500 iterations take ≈5–6 h on the sparse backbones and ≈3.5 h on the dense one.
+If episodes grow to the 512-decision cap, add ≈30 %. This is under half the 10–15 h budget.
+The iteration count is unchanged for these runs.
 
 ## Why
 
@@ -49,7 +60,8 @@ summary in `docs/freeplay.md`.
 - Same recipe on three backbones: connectome, shuffled s0, no-connectome. The paper question is whether the
   learning curves differ, not the end point.
 - Checkpoint eval: 10+ episodes, mean ± std for every reward component.
-- Budget: ~1000 iterations, 10–15 h per backbone on one L40S.
+- Budget: planned ~1000 iterations, 10–15 h per backbone on one L40S. Launched runs use 500
+  (see the status line).
 
 ## Step 4 (only if step 3 learns): fly-vs-fly
 
