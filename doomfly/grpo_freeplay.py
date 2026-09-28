@@ -93,6 +93,16 @@ class ShapedReward:
         return out
 
 
+@torch.no_grad()
+def apply_init(model, emb_from="deadly_corridor", nextw_bias=-4.0):
+    """The iter-0 policy: FREEPLAY embedding row copied from `emb_from` (or left as the surgery mean
+    when emb_from == "mean") and SELECT_NEXT_WEAPON bias set to `nextw_bias`. In place."""
+    emb = model.get_parameter("scenario_emb.weight")
+    if emb_from != "mean":
+        emb[FREEPLAY.id] = emb[SCENARIOS[emb_from].id]
+    model.get_parameter("heads.policy.2.bias")[NEXTW] = nextw_bias
+
+
 def summarise(trajs):
     """mean/std over episodes of R, T, dead and every raw component."""
     cols = {"R": [t["R"] for t in trajs], "T": [t["T"] for t in trajs], "dead": [float(t["dead"]) for t in trajs]}
@@ -138,11 +148,7 @@ def main():
     dev = torch.device(a.device)
     model, cfg = load_student(a.ckpt, a.connectome, dev)
     sid = FREEPLAY.id
-    with torch.no_grad():
-        emb = model.get_parameter("scenario_emb.weight")
-        if a.emb_from != "mean":
-            emb[sid] = emb[SCENARIOS[a.emb_from].id]
-        model.get_parameter("heads.policy.2.bias")[NEXTW] = a.nextw_bias
+    apply_init(model, a.emb_from, a.nextw_bias)
     model.eval()   # BatchNorm1d per recurrent step: stay in eval for sampling and update (see grpo.py)
     ref = None
     if a.beta:

@@ -92,9 +92,13 @@ into FlyNet → optional GRPO/RLOO fine-tuning against the frozen student.
 - **Free play on Freedoom II MAP01.** Zero-shot baselines are in `docs/freeplay.md`: the student
   survives 2.2× longer than random with its aiming prior and still dies in 8/10 episodes without
   leaving the first two rooms. Head surgery for `SELECT_NEXT_WEAPON` and a sixth scenario
-  embedding is done and tested (`tests/test_surgery.py`). Next: GRPO on MAP01 with shaped reward
-  on all three backbones, because a wiring prior would show where the policy has to learn rather
-  than imitate (`docs/freeplay-plan.md`).
+  embedding is done and tested (`tests/test_surgery.py`). GRPO on MAP01 with shaped reward
+  (`doomfly/grpo_freeplay.py`, 500 iterations per backbone) learns on all three backbones:
+  held-out return goes up by 2.1–4.2, p = 5e-5 for each. It plateaus in the start area because
+  the action set has no USE, so the policy cannot open doors or press the exit. The connectome
+  gives no advantage. No-connectome ends ahead by about 0.8 return (p ≈ 0.045, one run per
+  backbone) (`docs/freeplay.md`, "GRPO on MAP01").
+
 - **Fly vs fly.** ViZDoom duel with frozen-snapshot opponents and Elo, only if free play learns.
 - **GRPO follow-ups.** Adaptive β with a KL target, 50-episode evals, greedy eval of the three
   teachers that have no curve.
@@ -153,6 +157,8 @@ BatchNorm train/eval mismatch caught by a CPU smoke test before the first GPU ru
 | `doomfly/grpo.py` | Critic-free GRPO / RLOO fine-tuning of a distilled student against a frozen reference |
 | `doomfly/surgery.py` | Widens a trained head for free play; `load_flynet` is the one checkpoint loader |
 | `doomfly/freeplay_zero_shot.py` | Zero-shot evaluation on Freedoom II MAP01 |
+| `doomfly/grpo_freeplay.py` | GRPO on MAP01 with shaped reward (plan step 3) |
+| `doomfly/freeplay_eval.py` | Held-out-seed evaluation of a free-play checkpoint |
 | `doomfly/evaluate.py` | Plays the trained model and writes GIF/MP4 footage (`--tics`, `--pick`, `--fmt`) |
 | `infra/` | CDK stack `DoomFly` (S3 bucket, launch template, IAM, ASG) in `us-west-2` |
 | `scripts/` | Ship, launch, watch, clips, publish (see below) |

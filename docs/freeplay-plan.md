@@ -17,6 +17,13 @@ At that rate 500 iterations take ≈5–6 h on the sparse backbones and ≈3.5 h
 If episodes grow to the 512-decision cap, add ≈30 %. This is under half the 10–15 h budget.
 The iteration count is unchanged for these runs.
 
+Result (2026-09-27): all three runs finished (`fail=0`, 3.8–6.0 h each). Written up in
+`docs/freeplay.md`, section "GRPO on MAP01". All three backbones learn: held-out return goes
+up by 2.1–4.2, p = 5e-5 for each. All three plateau in the start area, because the FREEPLAY
+action set has no USE and so cannot open doors or press the exit switch. The connectome gives
+no measurable advantage. No-connectome ends ahead by +0.7 to +0.8 return (p ≈ 0.045, one run
+per backbone, not corrected for multiple comparisons). Nothing new has been launched.
+
 ## Why
 
 The five ViZDoom scenarios are saturated: the distilled student matches both PPO teachers, and twelve GRPO runs
